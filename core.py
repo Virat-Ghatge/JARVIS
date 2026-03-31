@@ -4,6 +4,7 @@ JARVIS Core Module
 Handles speech recognition, text-to-speech, and the main JARVIS class
 """
 
+import os
 import speech_recognition as sr
 import pyttsx3
 import threading
@@ -17,8 +18,18 @@ from web_search import WebSearchHandler
 from alarm import AlarmHandler
 from weather import WeatherHandler
 
-# Configuration
-WEATHER_API_KEY = "7bac7ec1ce4f6c70f158623f12251665"
+# Try to load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed, will use environment variables directly
+
+# Configuration - Get API key from environment variable
+WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
+if not WEATHER_API_KEY:
+    print("Warning: WEATHER_API_KEY not set. Weather functionality will not work.")
+    print("Please set the WEATHER_API_KEY environment variable or create a .env file.")
 
 
 class JARVIS:

@@ -18,8 +18,11 @@ class WeatherHandler:
         self.default_city = None  # Will try to detect or ask user
 
         # Test API key on startup (for debugging)
-        print("Debug: Testing weather API key...")
-        self.test_api_key()
+        if self.api_key:
+            print("Debug: Testing weather API key...")
+            self.test_api_key()
+        else:
+            print("Debug: No weather API key provided.")
 
     def _get_location(self, command):
         """Extract location from command or use default"""
@@ -52,6 +55,10 @@ class WeatherHandler:
 
     def get_current_weather(self, command):
         """Get current weather for a location"""
+        if not self.api_key:
+            self.jarvis.speak("Weather API key is not configured. Please set up your API key.")
+            return
+
         location = self._get_location(command)
 
         if not location:
@@ -109,6 +116,10 @@ class WeatherHandler:
 
     def get_forecast(self, command):
         """Get weather forecast for a location"""
+        if not self.api_key:
+            self.jarvis.speak("Weather API key is not configured. Please set up your API key.")
+            return
+
         location = self._get_location(command)
 
         if not location:
