@@ -10,12 +10,15 @@ A Python-based voice assistant inspired by Tony Stark's AI companion from Iron M
 
 | Feature | Description |
 |---------|-------------|
+| **Hybrid AI Mode** | Smart commands use AI, simple ones use fast local handlers |
+| **Offline Fallback** | Works without internet using local handlers |
 | **Time & Date** | Ask for current time, date, or day |
 | **Weather** | Get real-time weather updates for any city |
 | **Music** | Play music from YouTube, Spotify, or local files |
 | **Web Search** | Search Google with voice commands |
 | **Applications** | Open system applications hands-free |
 | **Alarms** | Set reminders and alarms |
+| **Natural Language** | Talk naturally - "I'm bored, play something upbeat" |
 
 ---
 
@@ -49,11 +52,16 @@ A Python-based voice assistant inspired by Tony Stark's AI companion from Iron M
    \`\`\`bash
    cp .env.example .env
    \`\`\`
-   Edit \`.env\` and add your OpenWeatherMap API key:
+   Edit \`.env\` and add your API keys:
    \`\`\`
-   WEATHER_API_KEY=your_api_key_here
+   # Weather (optional, for weather feature)
+   WEATHER_API_KEY=your_weather_api_key_here
+
+   # Gemini AI (optional, for AI-powered responses)
+   GEMINI_API_KEY=your_gemini_api_key_here
    \`\`\`
-   [Get a free API key here](https://openweathermap.org/api)
+   - [Get Weather API key](https://openweathermap.org/api)
+   - [Get Gemini API key (free)](https://aistudio.google.com/app/apikey)
 
 4. **Run JARVIS**
    \`\`\`bash
@@ -64,29 +72,69 @@ A Python-based voice assistant inspired by Tony Stark's AI companion from Iron M
 
 ## Voice Commands
 
-Simply speak naturally after JARVIS starts:
+### Quick Commands (Instant - No AI needed)
 
-| Command | Example |
-|---------|---------|
-| **Time** | "What time is it?" |
-| **Date** | "What's today's date?" |
-| **Weather** | "What's the weather in London?" |
-| **Music** | "Play some music" / "Play songs by Adele" |
-| **Open Apps** | "Open Chrome" / "Open Notepad" |
-| **Search** | "Search for Python tutorials" |
-| **Alarm** | "Set an alarm for 7 AM" |
-| **Greeting** | "Hello" / "How are you?" |
-| **Help** | "Help" |
-| **Exit** | "Exit" / "Goodbye" / "Shutdown" |
+| Command | What It Does |
+|---------|--------------|
+| "What time is it?" | Tells current time |
+| "What's the date?" | Tells today's date |
+| "Open Chrome" / "Open Spotify" | Opens applications |
+| "What's the weather in London?" | Weather update |
+| "Play some music" | Starts music |
+| "Search for Python tutorials" | Google search |
+| "Set alarm for 7 AM" | Sets alarm |
+| "Hello" / "How are you?" | Greeting |
+| "Goodbye" / "Exit" | Shutdown |
+
+### Natural Language (Uses AI - Needs API key)
+
+Any command not in the list above goes to Gemini AI:
+
+| Example | What Happens |
+|---------|--------------|
+| "I'm bored, play something upbeat" | AI → play_music |
+| "Who is the CEO of Google?" | AI → web_search |
+| "Tell me a joke" | AI responds directly |
+| "What do you think about AI?" | AI responds directly |
+
+**Note:** AI commands need internet and `GEMINI_API_KEY` in `.env` file.
 
 ---
+
+## How It Works
+
+JARVIS uses a simple **two-step** approach:
+
+1. **Check Local Commands First** - Direct keyword matching for speed
+2. **Ask AI If Needed** - Falls back to Gemini for anything else
+
+### Command Flow
+
+```
+User speaks
+    ↓
+Direct match? (time, date, open, weather, etc.)
+    ↓ Yes → Execute instantly (~1 second)
+    ↓ No
+Check AI available?
+    ↓ Yes → Ask Gemini to choose command → Execute (~3-4 seconds)
+    ↓ No
+Suggest available commands
+```
+
+### Why This Works
+
+- **Fast**: Common commands execute immediately
+- **Smart**: AI understands natural language like "play something upbeat"
+- **Simple**: Easy to add new commands
+- **Free**: Uses Gemini's generous free tier (1,500 requests/day)
 
 ## Project Structure
 
 \`\`\`
 jarvis-assistant/
 ├── main.py              # Entry point - run this file
-├── core.py              # Core JARVIS class (speech recognition, TTS)
+├── core.py              # Main JARVIS class with simple routing
 ├── date_time.py         # Time & date handler
 ├── applications.py      # Application launcher
 ├── music.py             # Music player (YouTube, Spotify, local)
@@ -131,11 +179,17 @@ You can customize JARVIS behavior in \`core.py\`:
 
 ## Technologies Used
 
-- **Python 3.7+** - Core language
-- **SpeechRecognition** - Speech-to-text
-- **pyttsx3** - Text-to-speech
-- **requests** - HTTP requests for API calls
-- **python-dotenv** - Environment variable management
+| Technology | Purpose | Free Tier |
+|------------|---------|-----------|
+| **Python 3.7+** | Core language | Free |
+| **SpeechRecognition** | Speech-to-text | Free |
+| **pyttsx3** | Text-to-speech | Free |
+| **Google Gemini** | AI language model | 1,500 req/day |
+| **OpenWeatherMap** | Weather data | 1,000 calls/day |
+| **requests** | HTTP requests | Free |
+| **python-dotenv** | Environment management | Free |
+
+**Total cost to run: $0** (with free tiers)
 
 ---
 
