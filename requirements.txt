@@ -5,7 +5,13 @@ python-dotenv>=1.0.0
 PyAudio>=0.2.13
 
 # Optional: For AI features (Gemini)
-google-generativeai>=0.7.0
+google-genai>=1.0.0
 
 # Optional: For checking if apps are running
 psutil>=5.9.0
+
+# Optional: For system controls (volume, brightness)
+pycaw>=20230407
+screen-brightness-control>=0.22.0
+pywin32>=306
+comtypes>=1.2.0

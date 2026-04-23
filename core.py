@@ -21,14 +21,15 @@ from music import MusicHandler
 from web_search import WebSearchHandler
 from alarm import AlarmHandler
 from weather import WeatherHandler
+from system_controls import SystemControls
 
-# Try to import Gemini
+# Try to import Gemini (new SDK)
 try:
-    import google.generativeai as genai
+    from google import genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
-    print("Note: google-generativeai not installed. AI features disabled.")
+    print("Note: google-genai not installed. AI features disabled.")
 
 
 class JARVIS:
@@ -46,6 +47,10 @@ Available commands:
 7. get_weather - Get weather for a city
 8. exit - Shutdown JARVIS
 9. conversation - General chat/greeting (no action needed)
+10. set_volume - Set system volume (0-100) or mute/unmute
+11. set_brightness - Set screen brightness (0-100)
+12. set_timer - Set a countdown timer (e.g., "5 minutes")
+13. stopwatch - Start/stop a stopwatch
 
 Respond in this exact format:
 COMMAND: <command_name>
@@ -123,10 +128,33 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         self.web_handler = WebSearchHandler(self)
         self.alarm_handler = AlarmHandler(self)
         self.weather_handler = WeatherHandler(self, os.getenv('WEATHER_API_KEY'))
+        self.system_controls = SystemControls(self)
 
         # Initialize AI
         self.ai_model = None
         self._init_ai()
+
+        # Wake word detection
+        self.is_sleeping = False
+        self.last_activity_time = time.time()
+        self.sleep_timeout = 300  # 5 minutes in seconds
+
+        # Wake word variations (handle different pronunciations)
+        self.wake_words = [
+            'jarvis',
+            'jarvis wake up',
+            'wake up jarvis',
+            'hey jarvis',
+            'hi jarvis',
+            'hello jarvis',
+            'jarvis are you there',
+            'jarvis online',
+            'jarvis activate',
+        ]
+
+        # Conversation memory (last 50 messages)
+        self.conversation_memory = []
+        self.max_memory = 50
 
         # Simple command mappings (fast lookup)
         self.simple_commands = {
@@ -155,8 +183,9 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
             return
 
         try:
-            genai.configure(api_key=api_key)
-            self.ai_model = genai.GenerativeModel('gemini-2.5-flash')
+            # New SDK: Create client and model
+            self.genai_client = genai.Client(api_key=api_key)
+            self.ai_model = 'gemini-2.5-flash'  # Model name for new SDK
             print("[✓] AI Engine ready")
         except Exception as e:
             print(f"[✗] AI Engine failed: {e}")
@@ -167,13 +196,16 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         self.engine.say(text)
         self.engine.runAndWait()
 
+        # Add to memory (but not for system messages)
+        if text and not any(skip in text.lower() for skip in ['listening', 'processing', 'couldn\'t understand']):
+            self.add_to_memory('assistant', text)
+
     def listen(self):
         """
         Listen for voice input with pause handling.
         Uses longer timeout to allow for pauses in speech.
         """
         with self.microphone as source:
-            print("\n🎤 Listening... (speak now)")
             # Adjust for ambient noise
             self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
 
@@ -208,13 +240,17 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         if not command:
             return True
 
+        # Add user message to memory
+        self.add_to_memory('user', command)
+
         # Check for exit first
         if any(word in command for word in ['exit', 'quit', 'goodbye', 'bye', 'shutdown']):
             return self._cmd_exit()
 
-        # Check simple command keywords
+        # Check simple command keywords (word-boundary match to avoid false triggers)
+        import re as _re
         for keyword, handler in self.simple_commands.items():
-            if keyword in command:
+            if _re.search(r'\b' + _re.escape(keyword) + r'\b', command):
                 return handler()
 
         # Check for specific patterns (must START with action words)
@@ -238,6 +274,16 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         if command.startswith(('alarm', 'remind', 'set alarm', 'set a reminder')):
             return self._cmd_alarm(command)
 
+        # System control commands
+        if any(word in command for word in ['volume', 'mute', 'unmute']):
+            return self._cmd_volume(command)
+        if any(word in command for word in ['brightness', 'dim', 'bright']):
+            return self._cmd_brightness(command)
+        if 'timer' in command:
+            return self._cmd_timer(command)
+        if any(word in command for word in ['stopwatch', 'stop watch']):
+            return self._cmd_stopwatch(command)
+
         # No local match - try AI if available
         if self.ai_model:
             return self._process_with_ai(command)
@@ -250,16 +296,18 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         print("[AI] Processing...")
 
         try:
-            # Build prompt
-            prompt = f"""{self.AVAILABLE_COMMANDS}
+            # Build prompt — include recent conversation memory for context
+            memory_context = self.get_memory_context()
+            prompt = f"""{self.AVAILABLE_COMMANDS}{memory_context}
 
 User: {command}
 """
 
-            # Get AI response
-            response = self.ai_model.generate_content(
-                prompt,
-                generation_config={'temperature': 0.3, 'max_output_tokens': 150}
+            # Get AI response using new SDK
+            response = self.genai_client.models.generate_content(
+                model=self.ai_model,
+                contents=prompt,
+                config={'temperature': 0.3, 'max_output_tokens': 150}
             )
 
             # Parse response
@@ -320,6 +368,17 @@ User: {command}
                     self.weather_handler.get_current_weather(f"weather in {params}")
                 else:
                     self.weather_handler.process_weather_command("weather")
+            elif cmd == 'set_volume':
+                self.system_controls.set_volume(params)
+            elif cmd == 'set_brightness':
+                self.system_controls.set_brightness(params)
+            elif cmd == 'set_timer':
+                self.system_controls.set_timer(params)
+            elif cmd == 'stopwatch':
+                if 'stop' in params.lower():
+                    self.system_controls.stop_stopwatch()
+                else:
+                    self.system_controls.start_stopwatch()
             # conversation and exit need no action here
         except Exception as e:
             print(f"[Execution Error] {e}")
@@ -399,6 +458,53 @@ User: {command}
         self.alarm_handler.set_alarm(command)
         return True
 
+    def _cmd_volume(self, command):
+        """Handle volume commands"""
+        if 'mute' in command:
+            if 'unmute' in command:
+                self.system_controls.unmute()
+            else:
+                self.system_controls.mute()
+        else:
+            self.system_controls.set_volume(command)
+        return True
+
+    def _cmd_brightness(self, command):
+        """Handle brightness commands"""
+        if 'increase' in command or 'up' in command:
+            self.system_controls.increase_brightness()
+        elif 'decrease' in command or 'down' in command or 'dim' in command:
+            self.system_controls.decrease_brightness()
+        else:
+            self.system_controls.set_brightness(command)
+        return True
+
+    def _cmd_timer(self, command):
+        """Handle timer commands"""
+        if 'cancel' in command or 'stop' in command:
+            self.system_controls.cancel_timer()
+        else:
+            self.system_controls.set_timer(command)
+        return True
+
+    def _cmd_stopwatch(self, command):
+        """Handle stopwatch commands"""
+        if 'start' in command:
+            self.system_controls.start_stopwatch()
+        elif 'stop' in command or 'end' in command:
+            self.system_controls.stop_stopwatch()
+        elif 'lap' in command:
+            self.system_controls.lap_stopwatch()
+        elif 'reset' in command:
+            self.system_controls.reset_stopwatch()
+        else:
+            # Default: start if not running, stop if running
+            if self.system_controls.stopwatch_running:
+                self.system_controls.stop_stopwatch()
+            else:
+                self.system_controls.start_stopwatch()
+        return True
+
     def _cmd_help(self):
         self.speak("I can tell you the time and date, open applications, check the weather, play music, search the web, or set alarms. I also understand natural language when my AI is active.")
         return True
@@ -418,10 +524,128 @@ User: {command}
 
         running = True
         while running:
-            command = self.listen()
+            # Check if should go to sleep
+            if not self.is_sleeping and time.time() - self.last_activity_time > self.sleep_timeout:
+                self._go_to_sleep()
+
+            # Listen for input
+            if self.is_sleeping:
+                # In sleep mode - only listen for wake word
+                command = self._listen_for_wake_word()
+            else:
+                # Normal mode - listen for commands
+                command = self.listen()
+
             if command:
-                running = self.process_command(command)
+                if self.is_sleeping:
+                    # Check if it's a wake word
+                    if self._is_wake_word(command):
+                        self._wake_up()
+                    # Ignore other commands while sleeping
+                else:
+                    # Process command normally
+                    self._update_activity()
+                    running = self.process_command(command)
+
             time.sleep(0.5)
+
+    def _listen_for_wake_word(self):
+        """Listen specifically for wake word when sleeping"""
+        with self.microphone as source:
+            print("\n💤 Sleeping... Say 'Jarvis' to wake me")
+            self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+
+            try:
+                # Listen continuously for wake word
+                audio = self.recognizer.listen(
+                    source,
+                    timeout=30,  # Check every 30 seconds
+                    phrase_time_limit=5
+                )
+                command = self.recognizer.recognize_google(audio).lower()
+                print(f"Heard: '{command}'")
+                return command
+            except sr.WaitTimeoutError:
+                return None
+            except sr.UnknownValueError:
+                return None
+            except sr.RequestError:
+                return None
+
+    def _is_wake_word(self, command):
+        """Check if command contains wake word"""
+        if not command:
+            return False
+
+        # Check for exact matches
+        for wake_word in self.wake_words:
+            if wake_word in command:
+                return True
+
+        # Fuzzy matching for different pronunciations
+        # Remove common variations and check similarity
+        cleaned = command.replace(' ', '').replace('-', '').replace('_', '')
+
+        # Check for "jarvis" in various forms (deduplicated)
+        jarvis_variations = [
+            'jarvis',
+            'jarviss',
+            'jarvus',
+            'jarvish',
+        ]
+
+        for variation in jarvis_variations:
+            if variation in cleaned:
+                return True
+
+        return False
+
+    def _wake_up(self):
+        """Wake up from sleep mode"""
+        self.is_sleeping = False
+        self._update_activity()
+        self.speak("I'm here, sir. How can I help you?")
+
+    def _go_to_sleep(self):
+        """Enter sleep mode"""
+        self.is_sleeping = True
+        print("\n💤 JARVIS going to sleep (5 minutes of inactivity)")
+        # Don't speak when going to sleep to avoid disturbing
+
+    def _update_activity(self):
+        """Update last activity time"""
+        self.last_activity_time = time.time()
+
+    # ==================== CONVERSATION MEMORY ====================
+
+    def add_to_memory(self, role, content):
+        """Add message to conversation memory"""
+        self.conversation_memory.append({
+            'role': role,
+            'content': content,
+            'timestamp': time.time()
+        })
+
+        # Keep only last 50 messages
+        if len(self.conversation_memory) > self.max_memory:
+            self.conversation_memory = self.conversation_memory[-self.max_memory:]
+
+    def get_memory_context(self):
+        """Get formatted conversation memory for AI context"""
+        if not self.conversation_memory:
+            return ""
+
+        context = "\n\nRecent conversation:\n"
+        for msg in self.conversation_memory[-10:]:  # Last 10 for context
+            role = "User" if msg['role'] == 'user' else "JARVIS"
+            context += f"{role}: {msg['content']}\n"
+
+        return context
+
+    def clear_memory(self):
+        """Clear conversation memory"""
+        self.conversation_memory.clear()
+        print("Conversation memory cleared")
 
 
 if __name__ == "__main__":

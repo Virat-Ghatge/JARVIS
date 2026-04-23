@@ -45,9 +45,12 @@ class AlarmHandler:
     def _alarm_checker(self):
         """Background thread to check alarms"""
         while True:
-            now = datetime.datetime.now().time()
+            now = datetime.datetime.now()
+            now_secs = now.hour * 3600 + now.minute * 60 + now.second
             for alarm in self.alarms[:]:
-                if now.hour == alarm.hour and now.minute == alarm.minute:
+                alarm_secs = alarm.hour * 3600 + alarm.minute * 60
+                # Trigger within a ±30-second window to avoid missing the minute
+                if abs(now_secs - alarm_secs) <= 30:
                     self.jarvis.speak("Sir, your alarm is going off!")
                     self.alarms.remove(alarm)
-            time.sleep(30)  # Check every 30 seconds
+            time.sleep(1)  # Check every second for precision
