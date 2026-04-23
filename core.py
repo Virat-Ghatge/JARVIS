@@ -5,6 +5,8 @@ Direct matching first, fallback to LLM
 """
 
 import os
+import asyncio
+import tempfile
 import speech_recognition as sr
 import pyttsx3
 import time
@@ -13,6 +15,22 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Try to import edge-tts (neural TTS — primary voice engine)
+try:
+    import edge_tts
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    EDGE_TTS_AVAILABLE = False
+    print("Note: edge-tts not installed. Using pyttsx3 for speech.")
+
+# Try to import pygame for audio playback
+try:
+    import pygame
+    PYGAME_AVAILABLE = True
+except ImportError:
+    PYGAME_AVAILABLE = False
+    print("Note: pygame not installed. Audio playback may be unavailable.")
 
 # Import handlers
 from date_time import DateTimeHandler
@@ -109,17 +127,27 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
 
-        # Initialize TTS
+        # Initialize pyttsx3 as fallback TTS
         self.engine = pyttsx3.init()
         self.engine.setProperty('rate', 175)
         self.engine.setProperty('volume', 1.0)
-
-        # Set voice
         voices = self.engine.getProperty('voices')
         for voice in voices:
             if 'male' in voice.name.lower() or 'david' in voice.name.lower():
                 self.engine.setProperty('voice', voice.id)
                 break
+
+        # Initialize pygame mixer for edge-tts audio playback
+        if EDGE_TTS_AVAILABLE and PYGAME_AVAILABLE:
+            try:
+                pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+                print("[✓] Neural TTS ready (edge-tts / en-GB-RyanNeural)")
+            except Exception as e:
+                print(f"[!] Pygame mixer init failed: {e} — using pyttsx3")
+        elif EDGE_TTS_AVAILABLE:
+            print("[!] edge-tts available but pygame missing — install pygame for audio playback")
+        else:
+            print("[✓] TTS ready (pyttsx3 fallback)")
 
         # Initialize handlers
         self.datetime_handler = DateTimeHandler(self)
@@ -191,14 +219,48 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
             print(f"[✗] AI Engine failed: {e}")
 
     def speak(self, text):
-        """Speak text"""
+        """Speak text — edge-tts neural voice with pyttsx3 fallback"""
         print(f"JARVIS: {text}")
-        self.engine.say(text)
-        self.engine.runAndWait()
+
+        if EDGE_TTS_AVAILABLE and PYGAME_AVAILABLE:
+            try:
+                asyncio.run(self._speak_edge_tts(text))
+            except Exception as e:
+                print(f"[Edge TTS Error] {e} — falling back to pyttsx3")
+                self.engine.say(text)
+                self.engine.runAndWait()
+        else:
+            self.engine.say(text)
+            self.engine.runAndWait()
 
         # Add to memory (but not for system messages)
-        if text and not any(skip in text.lower() for skip in ['listening', 'processing', 'couldn\'t understand']):
+        if text and not any(skip in text.lower() for skip in ['listening', 'processing', "couldn't understand"]):
             self.add_to_memory('assistant', text)
+
+    async def _speak_edge_tts(self, text):
+        """Synthesize speech via edge-tts and play through pygame."""
+        communicate = edge_tts.Communicate(
+            text,
+            voice="en-GB-RyanNeural",
+            rate="+8%",    # Crisp and efficient — JARVIS never dawdles
+            pitch="-3Hz",  # Slightly lower for authority
+        )
+
+        # Stream audio to a temp file then play
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            tmpfile = f.name
+
+        try:
+            await communicate.save(tmpfile)
+            pygame.mixer.music.load(tmpfile)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                await asyncio.sleep(0.05)
+        finally:
+            try:
+                os.unlink(tmpfile)
+            except OSError:
+                pass
 
     def listen(self):
         """

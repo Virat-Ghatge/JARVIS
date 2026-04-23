@@ -4,6 +4,10 @@ requests>=2.28.0
 python-dotenv>=1.0.0
 PyAudio>=0.2.13
 
+# Neural TTS (primary voice engine)
+edge-tts>=6.1.0
+pygame>=2.5.0
+
 # Optional: For AI features (Gemini)
 google-genai>=1.0.0
 
