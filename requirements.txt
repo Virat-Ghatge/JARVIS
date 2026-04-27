@@ -1,6 +1,7 @@
 SpeechRecognition>=3.10.0
 pyttsx3>=2.90
 requests>=2.28.0
+beautifulsoup4>=4.12.0
 python-dotenv>=1.0.0
 PyAudio>=0.2.13
 
@@ -10,6 +11,9 @@ pygame>=2.5.0
 
 # Optional: For AI features (Gemini)
 google-genai>=1.0.0
+
+# Groq API (free LLM for Q&A — llama-3.1-8b-instant)
+groq>=0.9.0
 
 # Optional: For checking if apps are running
 psutil>=5.9.0

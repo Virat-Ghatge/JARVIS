@@ -40,6 +40,7 @@ from web_search import WebSearchHandler
 from alarm import AlarmHandler
 from weather import WeatherHandler
 from system_controls import SystemControls
+from qa_handler import QAHandler
 
 # Try to import Gemini (new SDK)
 try:
@@ -69,6 +70,7 @@ Available commands:
 11. set_brightness - Set screen brightness (0-100)
 12. set_timer - Set a countdown timer (e.g., "5 minutes")
 13. stopwatch - Start/stop a stopwatch
+14. answer_question - Answer a factual/conversational question directly (who is X, what is Y, define Z, explain Z, why X). Put the ACTUAL ANSWER in the RESPONSE field — do not say "let me find that". Answer concisely in 1-2 sentences, addressing the user as sir.
 
 Respond in this exact format:
 COMMAND: <command_name>
@@ -92,9 +94,14 @@ PARAMS: London
 RESPONSE: Let me check the weather in London for you, sir.
 
 User: "Who is the CEO of Google?"
-COMMAND: web_search
-PARAMS: CEO of Google
-RESPONSE: Let me search for that information, sir.
+COMMAND: answer_question
+PARAMS: none
+RESPONSE: The CEO of Google is Sundar Pichai, sir.
+
+User: "What is quantum computing?"
+COMMAND: answer_question
+PARAMS: none
+RESPONSE: Quantum computing uses quantum mechanical phenomena such as superposition to perform computations far faster than classical computers, sir.
 
 User: "Play Attention on Spotify"
 COMMAND: play_music
@@ -157,10 +164,15 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         self.alarm_handler = AlarmHandler(self)
         self.weather_handler = WeatherHandler(self, os.getenv('WEATHER_API_KEY'))
         self.system_controls = SystemControls(self)
+        self.qa_handler = QAHandler(self)
 
         # Initialize AI
         self.ai_model = None
         self._init_ai()
+
+        # Initialize Groq Whisper STT
+        self.whisper_client = None
+        self._init_whisper()
 
         # Wake word detection
         self.is_sleeping = False
@@ -213,10 +225,56 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         try:
             # New SDK: Create client and model
             self.genai_client = genai.Client(api_key=api_key)
-            self.ai_model = 'gemini-2.5-flash'  # Model name for new SDK
-            print("[✓] AI Engine ready")
+            self.ai_model = 'gemini-1.5-flash'  # 1,500 req/day free (vs 20/day for 2.5-flash)
+            print("[✓] AI Engine ready (gemini-1.5-flash)")
         except Exception as e:
             print(f"[✗] AI Engine failed: {e}")
+
+    def _init_whisper(self):
+        """Initialize Groq Whisper-large-v3 for speech-to-text."""
+        api_key = os.getenv('GROQ_API_KEY')
+        if not api_key:
+            print("[!] GROQ_API_KEY not set — using Google STT")
+            return
+        try:
+            from groq import Groq as _Groq
+            self.whisper_client = _Groq(api_key=api_key)
+            print("[✓] Whisper STT ready (groq/whisper-large-v3)")
+        except Exception as e:
+            print(f"[!] Whisper init failed: {e} — falling back to Google STT")
+
+    def _transcribe_audio(self, audio):
+        """
+        Transcribe AudioData using Groq Whisper-large-v3.
+        Falls back to Google STT if Whisper is unavailable or fails.
+        """
+        if self.whisper_client:
+            try:
+                wav_bytes = audio.get_wav_data()
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+                    f.write(wav_bytes)
+                    tmp_path = f.name
+                try:
+                    with open(tmp_path, 'rb') as f:
+                        result = self.whisper_client.audio.transcriptions.create(
+                            model='whisper-large-v3',
+                            file=('audio.wav', f, 'audio/wav'),
+                            response_format='text',
+                            language='en',
+                        )
+                    text = result.strip() if isinstance(result, str) else result.text.strip()
+                    if text:
+                        return text.lower()
+                finally:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+            except Exception as e:
+                print(f"[Whisper] Error: {e} — falling back to Google STT")
+
+        # Google STT fallback
+        return self.recognizer.recognize_google(audio).lower()
 
     def speak(self, text):
         """Speak text — edge-tts neural voice with pyttsx3 fallback"""
@@ -264,33 +322,26 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
 
     def listen(self):
         """
-        Listen for voice input with pause handling.
-        Uses longer timeout to allow for pauses in speech.
+        Listen for voice input.
+        Transcribes via Groq Whisper-large-v3 (primary) or Google STT (fallback).
         """
         with self.microphone as source:
-            # Adjust for ambient noise
             self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
 
             try:
-                # Listen with longer timeout and phrase time
-                # timeout: max seconds to wait for speech to start
-                # phrase_time_limit: max seconds of speech to capture
                 audio = self.recognizer.listen(
                     source,
-                    timeout=10,        # Wait up to 10s for user to start speaking
-                    phrase_time_limit=10  # Capture up to 10s of speech (allows pauses)
+                    timeout=10,
+                    phrase_time_limit=10
                 )
-
                 print("Processing...")
-                command = self.recognizer.recognize_google(audio).lower()
+                command = self._transcribe_audio(audio)
                 print(f"You said: '{command}'")
                 return command
 
             except sr.WaitTimeoutError:
-                # No speech detected within timeout
                 return None
             except sr.UnknownValueError:
-                # Couldn't understand audio
                 print("Couldn't understand that, sir.")
                 return None
             except sr.RequestError as e:
@@ -329,7 +380,7 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         # Music play commands
         if command.startswith('play'):
             return self._cmd_play_music(command)
-        if command.startswith(('weather', "what's the weather", 'how is the weather', 'whats the weather')):
+        if command.startswith(('weather', "what's the weather", 'how is the weather', 'whats the weather', 'what is the weather', 'what\'s the weather')):
             return self._cmd_weather(command)
         if command.startswith(('search', 'look up', 'find')):
             return self._cmd_search(command)
@@ -346,7 +397,11 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         if any(word in command for word in ['stopwatch', 'stop watch']):
             return self._cmd_stopwatch(command)
 
-        # No local match - try AI if available
+        # Factual/conversational questions → Groq via QA handler
+        if self.qa_handler.is_question(command):
+            return self.qa_handler.answer_question(command)
+
+        # No local match - try Gemini for NLP classification
         if self.ai_model:
             return self._process_with_ai(command)
         else:
@@ -354,7 +409,7 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
             return True
 
     def _process_with_ai(self, command):
-        """Process command using Gemini AI"""
+        """Process command using Gemini for NLP. Falls back to Groq on quota errors."""
         print("[AI] Processing...")
 
         try:
@@ -365,47 +420,80 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
 User: {command}
 """
 
-            # Get AI response using new SDK
+            # Get AI response using Gemini
             response = self.genai_client.models.generate_content(
                 model=self.ai_model,
                 contents=prompt,
-                config={'temperature': 0.3, 'max_output_tokens': 150}
+                config={'temperature': 0.3, 'max_output_tokens': 200}
             )
 
-            # Parse response
-            text = response.text.strip()
-            print(f"[AI] Raw response: {text}")
-
-            # Extract command, params, and response
-            cmd = None
-            params = ""
-            resp = ""
-
-            for line in text.split('\n'):
-                line = line.strip()
-                if line.startswith('COMMAND:'):
-                    cmd = line.replace('COMMAND:', '').strip()
-                elif line.startswith('PARAMS:'):
-                    params = line.replace('PARAMS:', '').strip()
-                elif line.startswith('RESPONSE:'):
-                    resp = line.replace('RESPONSE:', '').strip()
-
-            # Speak the response
-            if resp:
-                self.speak(resp)
-
-            # Execute the command
-            if cmd and cmd != 'conversation':
-                self._execute_ai_command(cmd, params)
-
-            return True
+            return self._handle_ai_response(response.text, command)
 
         except Exception as e:
+            err = str(e)
+            if '429' in err or 'RESOURCE_EXHAUSTED' in err or 'quota' in err.lower():
+                print(f"[AI] Gemini quota hit — falling back to Groq for NLP")
+                return self._process_with_groq(command)
             print(f"[AI Error] {e}")
             self.speak("My apologies, sir. I'm having trouble with my AI systems right now.")
             return True
 
-    def _execute_ai_command(self, cmd, params):
+    def _process_with_groq(self, command):
+        """Use Groq (Llama) as NLP fallback when Gemini quota is exhausted."""
+        print("[AI] Groq NLP fallback...")
+
+        if not hasattr(self, 'qa_handler') or not self.qa_handler.groq_client:
+            self.speak("I'm sorry, sir. Both AI systems are currently unavailable.")
+            return True
+
+        try:
+            memory_context = self.get_memory_context()
+            prompt = f"""{self.AVAILABLE_COMMANDS}{memory_context}
+
+User: {command}
+"""
+            response = self.qa_handler.groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {"role": "system", "content": "You are a command classifier for JARVIS. Follow the exact output format specified."},
+                    {"role": "user",   "content": prompt},
+                ],
+                temperature=0.2,
+                max_tokens=200,
+            )
+            return self._handle_ai_response(response.choices[0].message.content, command)
+
+        except Exception as e:
+            print(f"[Groq NLP Error] {e}")
+            self.speak("My apologies, sir. I'm having trouble processing that right now.")
+            return True
+
+    def _handle_ai_response(self, text, command):
+        """Parse COMMAND/PARAMS/RESPONSE from AI output and execute."""
+        text = text.strip()
+        print(f"[AI] Raw response: {text}")
+
+        cmd, params, resp = None, "", ""
+
+        for line in text.split('\n'):
+            line = line.strip()
+            if line.startswith('COMMAND:'):
+                cmd = line.replace('COMMAND:', '').strip()
+            elif line.startswith('PARAMS:'):
+                params = line.replace('PARAMS:', '').strip()
+            elif line.startswith('RESPONSE:'):
+                resp = line.replace('RESPONSE:', '').strip()
+
+        # Speak response (skip for answer_question — qa_handler speaks the actual answer)
+        if resp and cmd != 'answer_question':
+            self.speak(resp)
+
+        if cmd and cmd != 'conversation':
+            self._execute_ai_command(cmd, params, original_command=command)
+
+        return True
+
+    def _execute_ai_command(self, cmd, params, original_command=''):
         """Execute command from AI"""
         try:
             if cmd == 'get_time':
@@ -441,6 +529,10 @@ User: {command}
                     self.system_controls.stop_stopwatch()
                 else:
                     self.system_controls.start_stopwatch()
+            elif cmd == 'answer_question':
+                # params may be 'none' for conversational questions — use original command
+                query = params if params and params.lower() != 'none' else original_command
+                self.qa_handler.answer_question(query)
             # conversation and exit need no action here
         except Exception as e:
             print(f"[Execution Error] {e}")
@@ -624,7 +716,7 @@ User: {command}
                     timeout=30,  # Check every 30 seconds
                     phrase_time_limit=5
                 )
-                command = self.recognizer.recognize_google(audio).lower()
+                command = self._transcribe_audio(audio)
                 print(f"Heard: '{command}'")
                 return command
             except sr.WaitTimeoutError:

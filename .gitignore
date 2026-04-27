@@ -37,3 +37,8 @@ ENV/
 
 # Logs
 *.log
+
+
+# testing scripts
+test_weather.py
+
