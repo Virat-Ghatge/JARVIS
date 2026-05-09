@@ -54,3 +54,25 @@ class AlarmHandler:
                     self.jarvis.speak("Sir, your alarm is going off!")
                     self.alarms.remove(alarm)
             time.sleep(1)  # Check every second for precision
+
+    def cancel_alarm(self):
+        """Cancel all active alarms with confirmation"""
+        if not self.alarms:
+            self.jarvis.speak("No active alarms to cancel, sir.")
+            return
+
+        # List active alarms
+        if len(self.alarms) == 1:
+            time_str = self.alarms[0].strftime("%I:%M %p")
+            self.jarvis.speak(f"You have one active alarm for {time_str}. Are you sure you want to cancel it?")
+        else:
+            self.jarvis.speak(f"You have {len(self.alarms)} active alarms. Are you sure you want to cancel all of them?")
+
+        # Ask for confirmation
+        response = self.jarvis.listen()
+        
+        if response and any(word in response.lower() for word in ['yes', 'yeah', 'yep', 'sure', 'cancel']):
+            self.alarms.clear()
+            self.jarvis.speak("All alarms have been cancelled, sir.")
+        else:
+            self.jarvis.speak("Alarms will remain active, sir.")

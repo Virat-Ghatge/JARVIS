@@ -307,7 +307,13 @@ class SystemControls:
 
     def _timer_worker(self, timer_id, duration):
         """Background thread for timer"""
-        time.sleep(duration)
+        elapsed = 0
+        while elapsed < duration:
+            # Check if timer was cancelled (removed from list)
+            if not any(t['id'] == timer_id for t in self.timers):
+                return
+            time.sleep(1)
+            elapsed += 1
 
         # Timer finished - beep and announce
         self._beep_timer()
@@ -347,12 +353,26 @@ class SystemControls:
         return " ".join(parts) if parts else "0 seconds"
 
     def cancel_timer(self):
-        """Cancel all active timers"""
-        if self.timers:
-            self.timers.clear()
-            self.jarvis.speak("All timers cancelled, sir.")
-        else:
+        """Cancel all active timers with confirmation"""
+        if not self.timers:
             self.jarvis.speak("No active timers to cancel, sir.")
+            return
+
+        # List active timers
+        if len(self.timers) == 1:
+            duration = self._format_duration(self.timers[0]['duration'])
+            self.jarvis.speak(f"You have one active timer for {duration}. Are you sure you want to cancel it?")
+        else:
+            self.jarvis.speak(f"You have {len(self.timers)} active timers. Are you sure you want to cancel all of them?")
+
+        # Ask for confirmation
+        response = self.jarvis.listen()
+        
+        if response and any(word in response.lower() for word in ['yes', 'yeah', 'yep', 'sure', 'cancel']):
+            self.timers.clear()
+            self.jarvis.speak("All timers have been cancelled, sir.")
+        else:
+            self.jarvis.speak("Timers will remain active, sir.")
 
     # ==================== STOPWATCH ====================
 

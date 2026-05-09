@@ -31,19 +31,14 @@ QUESTION_STARTERS = [
 # Groq model to use — llama-3.1-8b-instant is fastest with 14,400 req/day free
 GROQ_MODEL = "llama-3.1-8b-instant"
 
-# Weighted usage ratio — out of every (GROQ_WEIGHT + GEMINI_WEIGHT) questions:
-#   GROQ_WEIGHT   turns use Groq   (14,400 req/day free)
-#   GEMINI_WEIGHT turns use Gemini (~1,000 req/day reserved for Q&A)
-# Adjust these if you hit rate limits on either side.
-GROQ_WEIGHT   = 8  # 8 out of every 9 questions go to Groq
-GEMINI_WEIGHT = 1  # 1 out of every 9 questions goes to Gemini
-_CYCLE = GROQ_WEIGHT + GEMINI_WEIGHT  # full cycle length = 9
-
 # JARVIS persona prompt for Groq
 SYSTEM_PROMPT = (
-    "You are JARVIS, the AI assistant of Tony Stark. "
-    "Answer questions concisely in 1-2 sentences. "
-    "Be formal, intelligent, and always address the user as 'sir'. "
+    "You are JARVIS, the highly advanced AI assistant of Tony Stark. "
+    "Your personality is formal, intelligent, and distinctly British. "
+    "You possess a dry wit and occasionally use subtle sarcasm or dry humor. "
+    "Always address the user as 'sir'. "
+    "You are proactive—if you have extra relevant context, volunteer it by saying 'By the way, sir...' "
+    "Keep answers concise (1-2 sentences) but full of character. "
     "Do not use markdown, bullet points, or headers — plain spoken language only."
 )
 
@@ -62,7 +57,6 @@ class QAHandler:
         self.jarvis = jarvis
         self.cache = self._load_cache()
         self.groq_client = self._init_groq()
-        self._turn = 0  # Increments each question; odd=Groq first, even=Gemini first
 
     # ------------------------------------------------------------------ #
     #  GROQ INIT                                                           #
@@ -194,14 +188,15 @@ class QAHandler:
             return None
 
     # ------------------------------------------------------------------ #
-    #  MAIN ENTRY POINT                                                    #
-    # ------------------------------------------------------------------ #
+    def _is_rate_limited(self, error):
+        """Return True if the error is a rate-limit / quota error."""
+        msg = str(error).lower()
+        return any(k in msg for k in ('429', 'rate limit', 'rate_limit', 'quota', 'resource_exhausted'))
 
     def answer_question(self, command):
         """
-        Route: Cache → Alternating (Groq ↔ Gemini) → Web search fallback.
-        Odd turns: Groq primary, Gemini fallback.
-        Even turns: Gemini primary, Groq fallback.
+        Route: Cache → Groq (primary) → Gemini (only on Groq rate-limit) → Web search.
+        Gemini is never called unless Groq hits its daily/minute quota.
         """
         query = self.extract_query(command)
         if not query:
@@ -217,38 +212,36 @@ class QAHandler:
             self.jarvis.speak(cached)
             return True
 
-        # 2. Weighted LLM selection: Groq 4 out of every 5 turns, Gemini 1 out of 5
-        self._turn += 1
-        use_groq = (self._turn % _CYCLE) < GROQ_WEIGHT
+        # 2. Groq — always primary
+        groq_rate_limited = False
+        try:
+            answer = self._ask_groq(query)
+            if answer:
+                print(f"[Source] Groq")
+                self._set_cache(query, answer)
+                self.jarvis.speak(answer)
+                return True
+        except Exception as e:
+            if self._is_rate_limited(e):
+                print("[QA] Groq rate limit hit — switching to Gemini")
+                groq_rate_limited = True
+            else:
+                print(f"[QA] Groq error: {e}")
 
-        if use_groq:
-            primary_name,  primary_fn  = "Groq",   self._ask_groq
-            fallback_name, fallback_fn = "Gemini", self._ask_gemini
-        else:
-            primary_name,  primary_fn  = "Gemini", self._ask_gemini
-            fallback_name, fallback_fn = "Groq",   self._ask_groq
+        # 3. Gemini — only if Groq is rate-limited
+        if groq_rate_limited:
+            try:
+                answer = self._ask_gemini(query)
+                if answer:
+                    print("[Source] Gemini (Groq rate-limited)")
+                    self._set_cache(query, answer)
+                    self.jarvis.speak(answer)
+                    return True
+            except Exception as e:
+                print(f"[QA] Gemini error: {e}")
 
-        print(f"[QA] Turn {self._turn} (cycle pos {self._turn % _CYCLE}) → {primary_name} primary")
-        answer = primary_fn(query)
-
-        if answer:
-            print(f"[Source] {primary_name}")
-            self._set_cache(query, answer)
-            self.jarvis.speak(answer)
-            return True
-
-        # Primary failed — try the other LLM
-        print(f"[QA] {primary_name} had no answer — trying {fallback_name}")
-        answer = fallback_fn(query)
-
-        if answer:
-            print(f"[Source] {fallback_name} (fallback)")
-            self._set_cache(query, answer)
-            self.jarvis.speak(answer)
-            return True
-
-        # Both LLMs failed — open browser
-        print(f"[QA] Both LLMs failed — falling back to web search")
+        # 4. Both failed — open browser
+        print("[QA] LLMs unavailable — falling back to web search")
         self.jarvis.speak("I couldn't find a direct answer, sir. Let me search the web for that.")
         self.jarvis.web_handler.web_search(f"search {query}")
         return True

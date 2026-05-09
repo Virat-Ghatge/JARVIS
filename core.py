@@ -10,6 +10,8 @@ import tempfile
 import speech_recognition as sr
 import pyttsx3
 import time
+import threading
+import random
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -32,6 +34,14 @@ except ImportError:
     PYGAME_AVAILABLE = False
     print("Note: pygame not installed. Audio playback may be unavailable.")
 
+# Try to import noisereduce for pre-Whisper audio cleanup
+try:
+    import noisereduce as nr
+    import numpy as np
+    NOISEREDUCE_AVAILABLE = True
+except ImportError:
+    NOISEREDUCE_AVAILABLE = False
+
 # Import handlers
 from date_time import DateTimeHandler
 from applications import ApplicationHandler
@@ -40,6 +50,7 @@ from web_search import WebSearchHandler
 from alarm import AlarmHandler
 from weather import WeatherHandler
 from system_controls import SystemControls
+from system_info import SystemInfoHandler
 from qa_handler import QAHandler
 
 # Try to import Gemini (new SDK)
@@ -62,15 +73,17 @@ Available commands:
 3. open_app - Open an application (chrome, notepad, spotify, etc.)
 4. play_music - Play/control music. Play: "song name on spotify/youtube". Control: "pause", "next", "previous"
 5. web_search - Search Google for information (facts, people, news, etc.)
-6. set_alarm - Set an alarm/reminder
+6. set_alarm - Set an alarm/reminder (pass "cancel" in params to stop/cancel alarms)
 7. get_weather - Get weather for a city
-8. exit - Shutdown JARVIS
-9. conversation - General chat/greeting (no action needed)
-10. set_volume - Set system volume (0-100) or mute/unmute
-11. set_brightness - Set screen brightness (0-100)
-12. set_timer - Set a countdown timer (e.g., "5 minutes")
-13. stopwatch - Start/stop a stopwatch
-14. answer_question - Answer a factual/conversational question directly (who is X, what is Y, define Z, explain Z, why X). Put the ACTUAL ANSWER in the RESPONSE field — do not say "let me find that". Answer concisely in 1-2 sentences, addressing the user as sir.
+8. exit - Shutdown JARVIS completely
+9. sleep - Put JARVIS into sleep/standby mode (user says 'sleep', 'stand by', 'go to sleep', 'stand down')
+10. conversation - General chat/greeting (no action needed)
+11. set_volume - Set system volume (0-100) or mute/unmute
+12. set_brightness - Set screen brightness (0-100)
+13. set_timer - Set a countdown timer (pass "cancel" in params to stop/cancel timers)
+14. stopwatch - Start/stop a stopwatch
+15. get_system_info - Get system diagnostics (battery, CPU, RAM, temperature, internet speed, disk space)
+16. answer_question - Answer a factual/conversational question directly (who is X, what is Y, define Z, explain Z, why X). Put the ACTUAL ANSWER in the RESPONSE field — do not say "let me find that". Answer concisely in 1-2 sentences, addressing the user as sir.
 
 Respond in this exact format:
 COMMAND: <command_name>
@@ -97,6 +110,11 @@ User: "Who is the CEO of Google?"
 COMMAND: answer_question
 PARAMS: none
 RESPONSE: The CEO of Google is Sundar Pichai, sir.
+
+User: "Thank you JARVIS."
+COMMAND: conversation
+PARAMS: none
+RESPONSE: You are very welcome, sir. Always at your service.
 
 User: "What is quantum computing?"
 COMMAND: answer_question
@@ -130,9 +148,16 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         print("=" * 50)
         print("Initializing...\n")
 
-        # Initialize speech
+        # Initialize speech recognition
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
+
+        # Noise hardening: disable dynamic threshold so mic doesn't become
+        # hypersensitive in quiet rooms. Set a fixed floor high enough to
+        # ignore fans, keyboard clicks, and background hum.
+        self.recognizer.dynamic_energy_threshold = False
+        self.recognizer.energy_threshold = 3500   # tune up if still noisy
+        self.recognizer.pause_threshold = 0.8     # wait 0.8s of silence before stopping
 
         # Initialize pyttsx3 as fallback TTS
         self.engine = pyttsx3.init()
@@ -164,6 +189,7 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         self.alarm_handler = AlarmHandler(self)
         self.weather_handler = WeatherHandler(self, os.getenv('WEATHER_API_KEY'))
         self.system_controls = SystemControls(self)
+        self.system_info_handler = SystemInfoHandler(self)
         self.qa_handler = QAHandler(self)
 
         # Initialize AI
@@ -196,11 +222,32 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         self.conversation_memory = []
         self.max_memory = 50
 
-        # Simple command mappings (fast lookup)
+        # JARVIS-specific acknowledgment phrases
+        self.ack_phrases = [
+            "Right away, sir.",
+            "Consider it done.",
+            "I shall handle it immediately.",
+            "Processing your request now, sir.",
+            "Certainly, sir.",
+            "Of course."
+        ]
+
+        # Session tracking
+        self.session_start_time = time.time()
+        self.last_session_alert_hours = 0
+        
+        # System Warning State Trackers
+        self.battery_warned_20 = False
+        self.battery_warned_10 = False
+        self.battery_warned_5 = False
+        self.cpu_warned = False
+        self.ram_warned = False
+        self.temp_warned = False
+        
+        self._start_proactive_monitor()
+
+        # Simple command mappings (fast lookup for single words)
         self.simple_commands = {
-            'time': self._cmd_time,
-            'date': self._cmd_date,
-            'day': self._cmd_date,
             'exit': self._cmd_exit,
             'quit': self._cmd_exit,
             'goodbye': self._cmd_exit,
@@ -210,7 +257,6 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
             'hi': self._cmd_greet,
             'hey': self._cmd_greet,
             'help': self._cmd_help,
-            'status': self._cmd_status,
         }
 
         print(f"\nReady! Mode: {'Hybrid (Local + AI)' if self.ai_model else 'Local Only'}")
@@ -225,8 +271,8 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         try:
             # New SDK: Create client and model
             self.genai_client = genai.Client(api_key=api_key)
-            self.ai_model = 'gemini-1.5-flash'  # 1,500 req/day free (vs 20/day for 2.5-flash)
-            print("[✓] AI Engine ready (gemini-1.5-flash)")
+            self.ai_model = 'gemini-2.0-flash'  # 1,500 req/day free, supported by v1beta API
+            print("[✓] AI Engine ready (gemini-2.0-flash)")
         except Exception as e:
             print(f"[✗] AI Engine failed: {e}")
 
@@ -239,39 +285,87 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         try:
             from groq import Groq as _Groq
             self.whisper_client = _Groq(api_key=api_key)
+            self.whisper_rate_limited_until = 0  # epoch time; 0 = not rate-limited
             print("[✓] Whisper STT ready (groq/whisper-large-v3)")
         except Exception as e:
             print(f"[!] Whisper init failed: {e} — falling back to Google STT")
 
     def _transcribe_audio(self, audio):
         """
-        Transcribe AudioData using Groq Whisper-large-v3.
-        Falls back to Google STT if Whisper is unavailable or fails.
+        Transcribe AudioData using Groq Whisper-large-v3 (primary).
+        Falls back to Google STT when Whisper hits its rate limit (persists for 1 hour)
+        or on any other failure.
         """
+        WHISPER_COOLDOWN = 3600  # seconds to stay on Google STT after a 429
+
         if self.whisper_client:
-            try:
-                wav_bytes = audio.get_wav_data()
-                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
-                    f.write(wav_bytes)
-                    tmp_path = f.name
+            # Check if we're still in a rate-limit cooldown
+            if hasattr(self, 'whisper_rate_limited_until') and time.time() < self.whisper_rate_limited_until:
+                remaining = int(self.whisper_rate_limited_until - time.time())
+                print(f"[Whisper] Rate-limited — using Google STT ({remaining}s cooldown remaining)")
+            else:
                 try:
-                    with open(tmp_path, 'rb') as f:
-                        result = self.whisper_client.audio.transcriptions.create(
-                            model='whisper-large-v3',
-                            file=('audio.wav', f, 'audio/wav'),
-                            response_format='text',
-                            language='en',
-                        )
-                    text = result.strip() if isinstance(result, str) else result.text.strip()
-                    if text:
-                        return text.lower()
-                finally:
+                    wav_bytes = audio.get_wav_data()
+                    sample_rate = audio.sample_rate
+
+                    # Spectral noise reduction (if available) before sending to Whisper
+                    if NOISEREDUCE_AVAILABLE:
+                        try:
+                            audio_np = np.frombuffer(wav_bytes, dtype=np.int16).astype(np.float32)
+                            reduced_np = nr.reduce_noise(
+                                y=audio_np,
+                                sr=sample_rate,
+                                stationary=True,   # good for constant hum/fan noise
+                                prop_decrease=0.75 # reduce noise by 75%, keep speech natural
+                            )
+                            wav_bytes = reduced_np.astype(np.int16).tobytes()
+                        except Exception:
+                            pass  # silently fall through to original audio
+
+                    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+                        f.write(wav_bytes)
+                        tmp_path = f.name
                     try:
-                        os.unlink(tmp_path)
-                    except OSError:
-                        pass
-            except Exception as e:
-                print(f"[Whisper] Error: {e} — falling back to Google STT")
+                        with open(tmp_path, 'rb') as f:
+                            result = self.whisper_client.audio.transcriptions.create(
+                                model='whisper-large-v3',
+                                file=('audio.wav', f, 'audio/wav'),
+                                response_format='text',
+                                language='en',
+                            )
+                        text = result.strip() if isinstance(result, str) else result.text.strip()
+                        
+                        # Filter Whisper hallucinations (common noise artefacts)
+                        hallucinations = {
+                            'thank you.', 'thank you', 'thanks.', 'thanks',
+                            'thanks for watching.', 'thanks for watching',
+                            'you', 'you.', '.', '..', '...',
+                            'subtitles by', 'amara.org',
+                            'bye.', 'bye', 'okay.', 'okay', 'ok.', 'ok',
+                            'um', 'um.', 'uh', 'uh.', 'hmm', 'hmm.',
+                            'please subscribe.', 'subscribe.',
+                            'like and subscribe.', 'see you next time.',
+                        }
+                        if text_lower in hallucinations:
+                            return ""
+                        # Minimum word guard: single-word results are almost
+                        # always noise artefacts — require at least 2 words
+                        if len(text_lower.split()) < 2:
+                            return ""
+                        return text_lower
+                    finally:
+                        try:
+                            os.unlink(tmp_path)
+                        except OSError:
+                            pass
+
+                except Exception as e:
+                    err = str(e).lower()
+                    if any(k in err for k in ('429', 'rate limit', 'rate_limit', 'quota')):
+                        self.whisper_rate_limited_until = time.time() + WHISPER_COOLDOWN
+                        print(f"[Whisper] Rate limit hit — switching to Google STT for {WHISPER_COOLDOWN // 60} minutes")
+                    else:
+                        print(f"[Whisper] Error: {e} — falling back to Google STT")
 
         # Google STT fallback
         return self.recognizer.recognize_google(audio).lower()
@@ -300,8 +394,8 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         communicate = edge_tts.Communicate(
             text,
             voice="en-GB-RyanNeural",
-            rate="+8%",    # Crisp and efficient — JARVIS never dawdles
-            pitch="-3Hz",  # Slightly lower for authority
+            rate="+25%",   # Increased rate as requested
+            pitch="-5Hz",  # Slightly lower for authority
         )
 
         # Stream audio to a temp file then play
@@ -326,7 +420,11 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         Transcribes via Groq Whisper-large-v3 (primary) or Google STT (fallback).
         """
         with self.microphone as source:
-            self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+            # Calibrate once per listen cycle against current ambient noise
+            self.recognizer.adjust_for_ambient_noise(source, duration=1.0)
+            # Clamp: never let calibration drop threshold below our floor
+            if self.recognizer.energy_threshold < 3500:
+                self.recognizer.energy_threshold = 3500
 
             try:
                 audio = self.recognizer.listen(
@@ -334,9 +432,9 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
                     timeout=10,
                     phrase_time_limit=10
                 )
-                print("Processing...")
                 command = self._transcribe_audio(audio)
-                print(f"You said: '{command}'")
+                if command:
+                    print(f"You said: '{command}'")
                 return command
 
             except sr.WaitTimeoutError:
@@ -357,7 +455,9 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         self.add_to_memory('user', command)
 
         # Check for exit first
-        if any(word in command for word in ['exit', 'quit', 'goodbye', 'bye', 'shutdown']):
+        if any(word in command for word in [
+                'exit', 'quit', 'goodbye', 'bye', 'shutdown',
+                'shut down', 'power off', 'turn yourself off']):
             return self._cmd_exit()
 
         # Check simple command keywords (word-boundary match to avoid false triggers)
@@ -409,42 +509,24 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
             return True
 
     def _process_with_ai(self, command):
-        """Process command using Gemini for NLP. Falls back to Groq on quota errors."""
-        print("[AI] Processing...")
+        """NLP classification: Groq primary (14,400/day), Gemini fallback on rate limit."""
 
-        try:
-            # Build prompt — include recent conversation memory for context
-            memory_context = self.get_memory_context()
-            prompt = f"""{self.AVAILABLE_COMMANDS}{memory_context}
+        # Try Groq first
+        groq_result = self._process_with_groq(command)
+        if groq_result is not None:
+            return groq_result
 
-User: {command}
-"""
-
-            # Get AI response using Gemini
-            response = self.genai_client.models.generate_content(
-                model=self.ai_model,
-                contents=prompt,
-                config={'temperature': 0.3, 'max_output_tokens': 200}
-            )
-
-            return self._handle_ai_response(response.text, command)
-
-        except Exception as e:
-            err = str(e)
-            if '429' in err or 'RESOURCE_EXHAUSTED' in err or 'quota' in err.lower():
-                print(f"[AI] Gemini quota hit — falling back to Groq for NLP")
-                return self._process_with_groq(command)
-            print(f"[AI Error] {e}")
-            self.speak("My apologies, sir. I'm having trouble with my AI systems right now.")
-            return True
+        # Groq rate-limited or unavailable — try Gemini
+        print("[AI] Groq NLP unavailable — trying Gemini")
+        return self._process_with_gemini(command)
 
     def _process_with_groq(self, command):
-        """Use Groq (Llama) as NLP fallback when Gemini quota is exhausted."""
-        print("[AI] Groq NLP fallback...")
-
+        """
+        NLP classification via Groq (Llama). Primary NLP engine.
+        Returns True on success, None on rate-limit/unavailable (so caller can try Gemini).
+        """
         if not hasattr(self, 'qa_handler') or not self.qa_handler.groq_client:
-            self.speak("I'm sorry, sir. Both AI systems are currently unavailable.")
-            return True
+            return None
 
         try:
             memory_context = self.get_memory_context()
@@ -464,14 +546,40 @@ User: {command}
             return self._handle_ai_response(response.choices[0].message.content, command)
 
         except Exception as e:
+            err = str(e).lower()
+            if any(k in err for k in ('429', 'rate limit', 'rate_limit', 'quota')):
+                print(f"[AI] Groq rate limit hit — will try Gemini")
+                return None  # Signal caller to fall back
             print(f"[Groq NLP Error] {e}")
+            return None  # Any other error — also let Gemini try
+
+    def _process_with_gemini(self, command):
+        """NLP classification via Gemini. Fallback when Groq is rate-limited."""
+        if not self.ai_model:
+            self.speak("I'm sorry, sir. Both AI systems are currently unavailable.")
+            return True
+
+        try:
+            memory_context = self.get_memory_context()
+            prompt = f"""{self.AVAILABLE_COMMANDS}{memory_context}
+
+User: {command}
+"""
+            response = self.genai_client.models.generate_content(
+                model=self.ai_model,
+                contents=prompt,
+                config={'temperature': 0.3, 'max_output_tokens': 200}
+            )
+            return self._handle_ai_response(response.text, command)
+
+        except Exception as e:
+            print(f"[Gemini NLP Error] {e}")
             self.speak("My apologies, sir. I'm having trouble processing that right now.")
             return True
 
     def _handle_ai_response(self, text, command):
         """Parse COMMAND/PARAMS/RESPONSE from AI output and execute."""
         text = text.strip()
-        print(f"[AI] Raw response: {text}")
 
         cmd, params, resp = None, "", ""
 
@@ -484,8 +592,22 @@ User: {command}
             elif line.startswith('RESPONSE:'):
                 resp = line.replace('RESPONSE:', '').strip()
 
+        # Exit command — return False to stop the main loop
+        if cmd == 'exit':
+            self.speak(resp or "Goodbye, sir. JARVIS going offline.")
+            return False
+
+        # Sleep command — enter standby mode
+        if cmd == 'sleep':
+            self.speak(resp or "Going to standby mode, sir. Say 'JARVIS' when you need me.")
+            self._go_to_sleep(voiced=True)
+            return True
+
         # Speak response (skip for answer_question — qa_handler speaks the actual answer)
         if resp and cmd != 'answer_question':
+            # Occasionally use a JARVIS-specific acknowledgment if it's a simple command
+            if cmd in ['open_app', 'play_music', 'set_alarm', 'set_timer'] and random.random() < 0.4:
+                resp = random.choice(self.ack_phrases) + " " + resp
             self.speak(resp)
 
         if cmd and cmd != 'conversation':
@@ -512,23 +634,43 @@ User: {command}
             elif cmd == 'web_search':
                 self.web_handler.web_search(f"search {params}")
             elif cmd == 'set_alarm':
-                self.alarm_handler.set_alarm(f"set alarm for {params}")
-            elif cmd == 'get_weather':
-                if params and params != 'none':
-                    self.weather_handler.get_current_weather(f"weather in {params}")
+                if params and any(w in params.lower() for w in ['cancel', 'stop', 'off']):
+                    self.alarm_handler.cancel_alarm()
                 else:
-                    self.weather_handler.process_weather_command("weather")
+                    self.alarm_handler.set_alarm(f"set alarm for {params}")
+            elif cmd == 'get_weather':
+                is_forecast = 'forecast' in original_command.lower() or 'tomorrow' in original_command.lower()
+                
+                if params and params != 'none':
+                    if is_forecast:
+                        self.weather_handler.get_forecast(f"forecast for {params}")
+                    else:
+                        self.weather_handler.get_current_weather(f"weather in {params}")
+                else:
+                    self.weather_handler.process_weather_command(original_command)
             elif cmd == 'set_volume':
-                self.system_controls.set_volume(params)
+                low = params.lower()
+                if any(w in low for w in ['down', 'decrease', 'lower', 'quieter', 'softer', 'reduce']):
+                    self.system_controls.set_volume('volume down')
+                elif any(w in low for w in ['up', 'increase', 'louder', 'higher', 'raise']):
+                    self.system_controls.set_volume('volume up')
+                else:
+                    self.system_controls.set_volume(params)
             elif cmd == 'set_brightness':
                 self.system_controls.set_brightness(params)
             elif cmd == 'set_timer':
-                self.system_controls.set_timer(params)
+                if params and any(w in params.lower() for w in ['cancel', 'stop', 'off']):
+                    self.system_controls.cancel_timer()
+                else:
+                    self.system_controls.set_timer(params)
             elif cmd == 'stopwatch':
                 if 'stop' in params.lower():
                     self.system_controls.stop_stopwatch()
                 else:
                     self.system_controls.start_stopwatch()
+            elif cmd == 'get_system_info':
+                # Run the full diagnostic in a separate thread so it doesn't block the main loop completely
+                threading.Thread(target=self.system_info_handler.get_full_report, daemon=True).start()
             elif cmd == 'answer_question':
                 # params may be 'none' for conversational questions — use original command
                 query = params if params and params.lower() != 'none' else original_command
@@ -674,6 +816,7 @@ User: {command}
 
     def run(self):
         """Main loop"""
+        # Greeting
         self._cmd_greet()
 
         running = True
@@ -760,11 +903,12 @@ User: {command}
         self._update_activity()
         self.speak("I'm here, sir. How can I help you?")
 
-    def _go_to_sleep(self):
+    def _go_to_sleep(self, voiced=False):
         """Enter sleep mode"""
         self.is_sleeping = True
-        print("\n💤 JARVIS going to sleep (5 minutes of inactivity)")
-        # Don't speak when going to sleep to avoid disturbing
+        if not voiced:
+            # Auto-sleep from inactivity — silent
+            print("\n💤 JARVIS going to sleep (5 minutes of inactivity)")
 
     def _update_activity(self):
         """Update last activity time"""
@@ -800,6 +944,73 @@ User: {command}
         """Clear conversation memory"""
         self.conversation_memory.clear()
         print("Conversation memory cleared")
+
+    # ==================== PROACTIVE MONITORING ====================
+
+    def _start_proactive_monitor(self):
+        """Start the background thread that occasionally volunteers information."""
+        self.monitor_thread = threading.Thread(target=self._proactive_monitor, daemon=True)
+        self.monitor_thread.start()
+
+    def _proactive_monitor(self):
+        """Background loop that checks for session length and system alerts."""
+        while True:
+            time.sleep(60)  # Check every 60 seconds
+            
+            # 1. Session tracking (warn every 2 hours)
+            elapsed_hours = (time.time() - self.session_start_time) / 3600
+            if elapsed_hours >= self.last_session_alert_hours + 2:
+                self.last_session_alert_hours += 2
+                self.speak(f"Pardon the interruption, sir, but you have been working for {self.last_session_alert_hours} hours. I recommend stepping away from the screen momentarily.")
+
+            # 2. Hardware Monitoring
+            if hasattr(self, 'system_info_handler'):
+                stats = self.system_info_handler.get_quick_stats()
+                
+                # CPU Warning (>80%)
+                if stats['cpu'] > 80:
+                    if not self.cpu_warned:
+                        self.speak(f"Sir, CPU usage has exceeded 80 percent. Currently at {stats['cpu']} percent.")
+                        self.cpu_warned = True
+                else:
+                    self.cpu_warned = False  # Reset when it drops
+
+                # RAM Warning (>85%)
+                if stats['ram'] > 85:
+                    if not self.ram_warned:
+                        self.speak(f"Warning, sir. Memory usage is critical at {stats['ram']} percent.")
+                        self.ram_warned = True
+                else:
+                    self.ram_warned = False
+
+                # Temperature Warning (>75C)
+                if stats['temp'] and stats['temp'] > 75:
+                    if not self.temp_warned:
+                        self.speak(f"Sir, CPU temperature is elevated. Currently at {stats['temp']:.1f} degrees.")
+                        self.temp_warned = True
+                else:
+                    self.temp_warned = False
+
+                # Battery Warnings (20%, 10%, 5%)
+                battery = stats.get('battery')
+                plugged_in = stats.get('plugged_in')
+                if battery is not None and not plugged_in:
+                    if battery <= 5 and not self.battery_warned_5:
+                        self.speak(f"Critical battery warning, sir. Power levels are at {battery} percent. Shut down is imminent.")
+                        self.battery_warned_5 = True
+                    elif battery <= 10 and not self.battery_warned_10:
+                        self.speak(f"Sir, battery has dropped to {battery} percent. Please connect to a power source.")
+                        self.battery_warned_10 = True
+                    elif battery <= 20 and not self.battery_warned_20:
+                        self.speak(f"Sir, battery is at {battery} percent.")
+                        self.battery_warned_20 = True
+                elif plugged_in:
+                    # Reset battery warnings when plugged back in
+                    self.battery_warned_20 = False
+                    self.battery_warned_10 = False
+                    self.battery_warned_5 = False
+
+
 
 
 if __name__ == "__main__":

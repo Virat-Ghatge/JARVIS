@@ -25,24 +25,34 @@ class WeatherHandler:
             print("Debug: No weather API key provided.")
 
     def _get_location(self, command):
-        """Extract location from command or use default"""
-        # Common patterns to remove
+        """Extract city name from command string."""
+        import re as _re
+
+        location = command.lower().strip().rstrip('?.,!')
+
+        # Longest prefix first so 'weather in' does not shadow
+        # 'what is the weather in', etc.
         prefixes = [
-            'weather in', 'weather for', 'weather at',
             'what is the weather in', "what's the weather in",
-            'current weather in', 'forecast for', 'forecast in',
-            'weather', 'temperature in', 'temperature'
+            'whats the weather in', 'how is the weather in',
+            'current weather in', 'weather forecast for',
+            'forecast for', 'forecast in',
+            'weather in', 'weather for', 'weather at',
+            'temperature in', 'temperature at',
+            'weather', 'temperature',
         ]
-
-        location = command.lower()
         for prefix in prefixes:
-            location = location.replace(prefix, '').strip()
+            if location.startswith(prefix):
+                location = location[len(prefix):].strip()
+                break  # apply only the first (longest) match
 
-        # Remove common words
-        words_to_remove = ['today', 'tomorrow', 'now', 'please', 'the', 'a', 'an']
-        for word in words_to_remove:
-            location = location.replace(word, '').strip()
+        # Remove filler words with word boundaries ONLY.
+        # NEVER use plain .replace() on short words like 'a' — it deletes
+        # every occurrence of that character from the entire string.
+        for word in ['today', 'tomorrow', 'now', 'please', 'currently']:
+            location = _re.sub(r'' + word + r'', '', location)
 
+        location = ' '.join(location.split()).strip().rstrip('?.,!')
         return location if location else self.default_city
 
     def _kelvin_to_celsius(self, kelvin):
