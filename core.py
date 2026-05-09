@@ -334,6 +334,7 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
                                 language='en',
                             )
                         text = result.strip() if isinstance(result, str) else result.text.strip()
+                        text_lower = text.lower()
                         
                         # Filter Whisper hallucinations (common noise artefacts)
                         hallucinations = {
