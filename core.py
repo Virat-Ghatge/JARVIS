@@ -318,7 +318,15 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
                                 stationary=True,   # good for constant hum/fan noise
                                 prop_decrease=0.75 # reduce noise by 75%, keep speech natural
                             )
-                            wav_bytes = reduced_np.astype(np.int16).tobytes()
+                            # Re-wrap in a proper WAV container so Whisper accepts it
+                            import io as _io, wave as _wave
+                            buf = _io.BytesIO()
+                            with _wave.open(buf, 'wb') as wf:
+                                wf.setnchannels(1)
+                                wf.setsampwidth(2)   # 16-bit
+                                wf.setframerate(sample_rate)
+                                wf.writeframes(reduced_np.astype(np.int16).tobytes())
+                            wav_bytes = buf.getvalue()
                         except Exception:
                             pass  # silently fall through to original audio
 
