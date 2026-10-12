@@ -70,5 +70,17 @@
   "what will you do to change your name": {
     "answer": "A most intriguing inquiry, sir. I shall be renamed to FRIDAY, a nod to the esteemed butler from the classic film \"Fawlty Towers,\" as per Tony Stark's recent directive, sir.",
     "timestamp": 1779992367.0255666
+  },
+  "what is the price value of nifty index right now": {
+    "answer": "I'm afraid I'm not directly connected to the global financial networks at the moment, sir. However, I can suggest checking the latest market data on a reliable financial website or platform, such as Bloomberg or Yahoo Finance. They should have the most up-to-date information on the Nifty Index, sir.\n\nBy the way, sir, the Nifty Index is a benchmark stock market index of 50 of the largest and most liquid stocks listed on the National Stock Exchange of India.",
+    "timestamp": 1781517585.3259265
+  },
+  "what is the bom bse index level right now": {
+    "answer": "Sir, I'm afraid I don't have real-time access to external data feeds at the moment. However, I can suggest checking the financial news or a reliable online source for the current BSE index level. By the way, sir, I did notice that the Indian market has been experiencing some volatility lately, if you'd like me to provide some historical context.",
+    "timestamp": 1781517646.9079757
+  },
+  "what does it mean": {
+    "answer": "A rather vague inquiry, sir. Could you please provide more context or clarify what you would like me to explain? I'm at your service, ready to shed light on any topic you'd like to discuss.",
+    "timestamp": 1784392885.1958168
   }
 }

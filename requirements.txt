@@ -23,3 +23,9 @@ pycaw>=20230407
 screen-brightness-control>=0.22.0
 pywin32>=306
 comtypes>=1.2.0
+
+# Meeting Attendant (auto-join Google Meet / Teams)
+playwright>=1.40.0
+APScheduler>=3.10.0
+fastapi>=0.100.0
+uvicorn>=0.23.0

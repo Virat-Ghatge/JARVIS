@@ -52,6 +52,7 @@ from weather import WeatherHandler
 from system_controls import SystemControls
 from system_info import SystemInfoHandler
 from qa_handler import QAHandler
+from meeting_handler import MeetingHandler
 
 # Try to import Gemini (new SDK)
 try:
@@ -84,6 +85,7 @@ Available commands:
 14. stopwatch - Start/stop a stopwatch
 15. get_system_info - Get system diagnostics (battery, CPU, RAM, temperature, internet speed, disk space)
 16. answer_question - Answer a factual/conversational question directly (who is X, what is Y, define Z, explain Z, why X). Put the ACTUAL ANSWER in the RESPONSE field — do not say "let me find that". Answer concisely in 1-2 sentences, addressing the user as sir.
+17. meeting_command - Meeting management: schedule/list/cancel/join/leave meetings, open meeting dashboard. Params: the full user command text.
 
 Respond in this exact format:
 COMMAND: <command_name>
@@ -140,6 +142,26 @@ User: "Tell me a joke"
 COMMAND: conversation
 PARAMS: none
 RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
+
+User: "Schedule standup at 2 PM with link https://meet.google.com/abc"
+COMMAND: meeting_command
+PARAMS: schedule standup at 2 PM with link https://meet.google.com/abc
+RESPONSE: Scheduling your meeting, sir.
+
+User: "What meetings do I have today?"
+COMMAND: meeting_command
+PARAMS: what meetings do i have today
+RESPONSE: Let me check your schedule, sir.
+
+User: "Leave the meeting"
+COMMAND: meeting_command
+PARAMS: leave the meeting
+RESPONSE: Leaving the meeting, sir.
+
+User: "Open schedule dashboard"
+COMMAND: meeting_command
+PARAMS: open schedule dashboard
+RESPONSE: Opening the dashboard, sir.
 """
 
     def __init__(self):
@@ -191,6 +213,7 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         self.system_controls = SystemControls(self)
         self.system_info_handler = SystemInfoHandler(self)
         self.qa_handler = QAHandler(self)
+        self.meeting_handler = MeetingHandler(self)
 
         # Initialize AI
         self.ai_model = None
@@ -271,8 +294,8 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         try:
             # New SDK: Create client and model
             self.genai_client = genai.Client(api_key=api_key)
-            self.ai_model = 'gemini-2.0-flash'  # 1,500 req/day free, supported by v1beta API
-            print("[✓] AI Engine ready (gemini-2.0-flash)")
+            self.ai_model = 'gemini-3.5-flash-lite'  # 1,500 req/day free, supported by v1beta API
+            print("[✓] AI Engine ready (gemini-3.5-flash-lite)")
         except Exception as e:
             print(f"[✗] AI Engine failed: {e}")
 
@@ -496,6 +519,15 @@ RESPONSE: Why did the programmer quit his job? Because he didn't get arrays!
         if command.startswith(('alarm', 'remind', 'set alarm', 'set a reminder')):
             return self._cmd_alarm(command)
 
+        # Meeting commands
+        if any(phrase in command for phrase in [
+            'schedule', 'meeting', 'meetings', 'join meeting',
+            'leave the meeting', 'leave meeting', 'cancel my next meeting',
+            'open schedule', 'open dashboard', 'meeting dashboard',
+            'meet.google.com', 'teams.microsoft.com',
+        ]):
+            return self._cmd_meeting(command)
+
         # System control commands
         if any(word in command for word in ['volume', 'mute', 'unmute']):
             return self._cmd_volume(command)
@@ -680,6 +712,9 @@ User: {command}
             elif cmd == 'get_system_info':
                 # Run the full diagnostic in a separate thread so it doesn't block the main loop completely
                 threading.Thread(target=self.system_info_handler.get_full_report, daemon=True).start()
+            elif cmd == 'meeting_command':
+                query = params if params and params.lower() != 'none' else original_command
+                self.meeting_handler.process_meeting_command(query)
             elif cmd == 'answer_question':
                 # params may be 'none' for conversational questions — use original command
                 query = params if params and params.lower() != 'none' else original_command
@@ -763,6 +798,11 @@ User: {command}
         self.alarm_handler.set_alarm(command)
         return True
 
+    def _cmd_meeting(self, command):
+        """Handle meeting commands"""
+        self.meeting_handler.process_meeting_command(command)
+        return True
+
     def _cmd_volume(self, command):
         """Handle volume commands"""
         if 'mute' in command:
@@ -811,7 +851,7 @@ User: {command}
         return True
 
     def _cmd_help(self):
-        self.speak("I can tell you the time and date, open applications, check the weather, play music, search the web, or set alarms. I also understand natural language when my AI is active.")
+        self.speak("I can tell you the time and date, open applications, check the weather, play music, search the web, set alarms, and manage your meeting schedule. I also understand natural language when my AI is active.")
         return True
 
     def _cmd_status(self):

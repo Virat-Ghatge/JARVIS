@@ -2,7 +2,7 @@
 
 > **Just A Rather Very Intelligent System**
 
-A Python-based voice assistant inspired by Tony Stark's AI companion from Iron Man. JARVIS listens to your voice commands and helps you with daily tasks.
+A Python-based voice assistant inspired by Tony Stark's AI companion from Iron Man. JARVIS listens to your voice commands, manages scheduled meetings, controls system settings, and assists with daily tasks using a hybrid offline-first and AI-powered engine.
 
 ---
 
@@ -10,15 +10,19 @@ A Python-based voice assistant inspired by Tony Stark's AI companion from Iron M
 
 | Feature | Description |
 |---------|-------------|
-| **Hybrid AI Mode** | Smart commands use AI, simple ones use fast local handlers |
-| **Offline Fallback** | Works without internet using local handlers |
-| **Time & Date** | Ask for current time, date, or day |
-| **Weather** | Get real-time weather updates for any city |
-| **Music** | Play music from YouTube, Spotify, or local files |
-| **Web Search** | Search Google with voice commands |
-| **Applications** | Open system applications hands-free |
-| **Alarms** | Set reminders and alarms |
-| **Natural Language** | Talk naturally - "I'm bored, play something upbeat" |
+| **Meeting Attendant** | Automatically joins, monitors, and leaves Google Meet & Microsoft Teams calls |
+| **Meeting Dashboard** | Modern web interface (`http://localhost:5050`) to view, add, and manage meeting schedules |
+| **Hybrid AI Routing** | Instant execution for local commands; Gemini & Groq LLMs for natural language queries |
+| **Offline Fallback** | Core functions (time, apps, system controls, meetings) work seamlessly without internet |
+| **System Controls** | Voice control for system volume, brightness, and audio mute/unmute |
+| **System Info** | Real-time monitoring of battery percentage, charging state, and CPU load |
+| **Knowledge & Q&A** | High-speed answers powered by Groq (Llama 3.1) and Gemini with local caching |
+| **Time & Date** | Current time, date, day of week, and time zone inquiries |
+| **Weather** | Real-time weather forecasts and conditions via OpenWeatherMap |
+| **Music Playback** | Voice-controlled playback on YouTube, Spotify, or local audio files |
+| **Web Search** | Hands-free Google searches with summarized results |
+| **Applications** | Launch, switch, and close system desktop applications |
+| **Alarms & Reminders**| Set voice alarms, timers, and scheduled notifications |
 
 ---
 
@@ -26,126 +30,180 @@ A Python-based voice assistant inspired by Tony Stark's AI companion from Iron M
 
 ### Prerequisites
 
-- Python 3.7 or higher
-- Microphone for voice input
-- Internet connection (for speech recognition and web features)
+- **Python 3.8+** (Required by Playwright)
+- **Google Chrome** installed (used for meeting automation)
+- Microphone and speakers/headphones
+- Internet connection (for AI features, speech recognition, and web features)
 
 ### Installation
 
 1. **Clone the repository**
-   \`\`\`bash
+   ```bash
    git clone https://github.com/yourusername/jarvis-assistant.git
    cd jarvis-assistant
-   \`\`\`
+   ```
 
-2. **Install dependencies**
-   \`\`\`bash
+2. **Install Python dependencies**
+   ```bash
    pip install -r requirements.txt
-   \`\`\`
+   ```
 
-   **Note:** PyAudio may require additional setup:
-   - **Windows:** \`pip install pipwin && pipwin install pyaudio\`
-   - **macOS:** \`brew install portaudio && pip install pyaudio\`
-   - **Linux:** \`sudo apt-get install python3-pyaudio\`
+   *Platform note for PyAudio (if not installed automatically):*
+   - **Windows:** `pip install pipwin && pipwin install pyaudio`
+   - **macOS:** `brew install portaudio && pip install pyaudio`
+   - **Linux:** `sudo apt-get install python3-pyaudio`
 
-3. **Configure API Keys**
-   \`\`\`bash
+3. **Install Playwright browser binaries**
+   ```bash
+   python -m playwright install chromium
+   ```
+
+4. **One-Time Meeting Account Setup (Recommended)**
+   To enable seamless auto-join for Google Meet and Microsoft Teams without repeated 2FA or login prompts:
+   ```bash
+   python -m modules.meeting_bot --setup
+   ```
+   This launches Chrome using JARVIS's persistent profile (`.browser_profile/`). Sign into your Google and Microsoft accounts once and close the browser. All sessions and cookies are saved locally.
+
+5. **Configure Environment Variables**
+   ```bash
    cp .env.example .env
-   \`\`\`
-   Edit \`.env\` and add your API keys:
-   \`\`\`
-   # Weather (optional, for weather feature)
+   ```
+   Edit `.env` to configure your keys and preferences:
+   ```env
+   # Weather (optional, for weather forecasts)
    WEATHER_API_KEY=your_weather_api_key_here
 
-   # Gemini AI (optional, for AI-powered responses)
+   # Gemini AI (optional, for AI-powered intent routing)
    GEMINI_API_KEY=your_gemini_api_key_here
-   \`\`\`
+
+   # Groq API (optional, for ultra-fast Q&A with Llama 3.1)
+   GROQ_API_KEY=your_groq_api_key_here
+
+   # Meeting Schedule Web Dashboard
+   MEETING_DASHBOARD_PORT=5050
+   MEETING_DASHBOARD_HOST=127.0.0.1
+   ```
    - [Get Weather API key](https://openweathermap.org/api)
    - [Get Gemini API key (free)](https://aistudio.google.com/app/apikey)
+   - [Get Groq API key (free)](https://console.groq.com)
 
-4. **Run JARVIS**
-   \`\`\`bash
+6. **Run JARVIS**
+   ```bash
    python main.py
-   \`\`\`
+   ```
+
+---
+
+## Automated Meeting Attendant
+
+JARVIS includes a fully automated meeting attendant for **Google Meet** and **Microsoft Teams**.
+
+### How It Works
+
+```
+Schedule Stored (config/meetings.json)
+       ↓
+APScheduler triggers ~60s before start time
+       ↓
+Playwright launches Chrome with persistent profile (.browser_profile)
+       ↓
+Navigates to Meet / Teams link
+       ↓
+Auto-mutes microphone & disables camera
+       ↓
+Clicks "Join Now" / "Ask to Join"
+       ↓
+Monitors call status (participant count & scheduled end time)
+       ↓
+Leaves call automatically when meeting concludes or room empties
+```
+
+### Features
+
+- **Mic & Camera Auto-Off**: Always turns off camera and mutes microphone before entering.
+- **Headless & Headed Safety**: Runs headed in Chrome with persistent session state so you can observe the call.
+- **Smart Exit**: Automatically clicks the "Leave" button when the scheduled end time is reached or when other participants leave.
+- **Web Dashboard**: An integrated dashboard served at `http://localhost:5050` featuring:
+  - Live timeline of upcoming and past meetings
+  - Quick-add form with natural language time parsing
+  - Bulk JSON import and export
+  - Instant manual "Join" and "Cancel" buttons
 
 ---
 
 ## Voice Commands
 
-### Quick Commands (Instant - No AI needed)
+### Meeting Commands
+
+| Command | Action |
+|---------|--------|
+| *"Schedule meeting Project Sync at 3 PM https://meet.google.com/xxx-yyyy-zzz"* | Schedules a meeting with auto-join |
+| *"What meetings do I have today?"* / *"List my meetings"* | Reads out upcoming scheduled meetings |
+| *"Cancel meeting Project Sync"* | Cancels a scheduled meeting |
+| *"Join meeting Project Sync"* | Immediately joins a meeting by title |
+| *"Join meeting https://teams.microsoft.com/..."* | Immediately joins a meeting by URL |
+| *"Leave meeting"* | Disconnects and leaves the active meeting |
+| *"Open meeting dashboard"* | Opens the web dashboard in your browser |
+
+### Quick Local Commands (Instant - No AI Latency)
 
 | Command | What It Does |
 |---------|--------------|
-| "What time is it?" | Tells current time |
-| "What's the date?" | Tells today's date |
-| "Open Chrome" / "Open Spotify" | Opens applications |
-| "What's the weather in London?" | Weather update |
-| "Play some music" | Starts music |
-| "Search for Python tutorials" | Google search |
-| "Set alarm for 7 AM" | Sets alarm |
-| "Hello" / "How are you?" | Greeting |
-| "Goodbye" / "Exit" | Shutdown |
+| *"What time is it?"* | Speaks the current time |
+| *"What is today's date?"* | Speaks today's date |
+| *"Set volume to 50%"* / *"Mute volume"* | Adjusts system audio |
+| *"Set brightness to 80%"* | Adjusts display brightness |
+| *"Check battery"* / *"System status"* | Reports battery percentage & CPU load |
+| *"Open Chrome"* / *"Open Spotify"* | Launches applications |
+| *"What's the weather in London?"* | Real-time weather update |
+| *"Play some music"* / *"Play lo-fi on YouTube"* | Starts music streaming |
+| *"Search for Python tutorials"* | Conducts Google search |
+| *"Set alarm for 7 AM"* | Sets an alarm |
+| *"Hello"* / *"How are you?"* | Speaks greeting |
+| *"Goodbye"* / *"Exit"* | Shuts down JARVIS |
 
-### Natural Language (Uses AI - Needs API key)
+### Natural Language (AI-Powered)
 
-Any command not in the list above goes to Gemini AI:
+Any complex request not matched locally is analyzed by Gemini / Groq:
 
-| Example | What Happens |
+| Example | Action Taken |
 |---------|--------------|
-| "I'm bored, play something upbeat" | AI → play_music |
-| "Who is the CEO of Google?" | AI → web_search |
-| "Tell me a joke" | AI responds directly |
-| "What do you think about AI?" | AI responds directly |
-
-**Note:** AI commands need internet and `GEMINI_API_KEY` in `.env` file.
+| *"I have a team standup tomorrow at 10 AM on Google Meet, link is..."* | AI schedules the meeting |
+| *"I'm feeling tired, play something relaxing"* | AI selects music query |
+| *"Explain quantum computing in simple terms"* | AI answers via Groq/Gemini |
+| *"Who directed Interstellar?"* | AI answers question directly |
 
 ---
 
-## How It Works
-
-JARVIS uses a simple **two-step** approach:
-
-1. **Check Local Commands First** - Direct keyword matching for speed
-2. **Ask AI If Needed** - Falls back to Gemini for anything else
-
-### Command Flow
-
-```
-User speaks
-    ↓
-Direct match? (time, date, open, weather, etc.)
-    ↓ Yes → Execute instantly (~1 second)
-    ↓ No
-Check AI available?
-    ↓ Yes → Ask Gemini to choose command → Execute (~3-4 seconds)
-    ↓ No
-Suggest available commands
-```
-
-### Why This Works
-
-- **Fast**: Common commands execute immediately
-- **Smart**: AI understands natural language like "play something upbeat"
-- **Simple**: Easy to add new commands
-- **Free**: Uses Gemini's generous free tier (1,500 requests/day)
-
 ## Project Structure
 
-\`\`\`
+```
 jarvis-assistant/
-├── main.py              # Entry point - run this file
-├── core.py              # Main JARVIS class with simple routing
-├── date_time.py         # Time & date handler
-├── applications.py      # Application launcher
-├── music.py             # Music player (YouTube, Spotify, local)
-├── web_search.py        # Google search handler
-├── alarm.py             # Alarm & reminder handler
-├── weather.py           # Weather API handler
-├── requirements.txt     # Python dependencies
-├── .env.example         # Environment variables template
-├── .gitignore          # Git ignore rules
-└── README.md            # This file
-\`\`\`
+├── main.py                     # Entry point - initializes and starts JARVIS
+├── core.py                     # Central assistant engine & intent routing
+├── meeting_handler.py          # Voice command handler for meetings
+├── system_controls.py          # System volume & display brightness controls
+├── system_info.py              # Battery status and CPU monitoring
+├── qa_handler.py               # Groq & Gemini knowledge Q&A engine
+├── date_time.py                # Time & date handler
+├── applications.py             # Application launcher
+├── music.py                    # Music player (YouTube, Spotify, local files)
+├── web_search.py               # Google web search handler
+├── alarm.py                    # Alarm & reminder handler
+├── weather.py                  # OpenWeatherMap API integration
+├── modules/
+│   ├── __init__.py             # Modules package definition
+│   ├── meeting_bot.py          # Playwright browser automation (Meet & Teams)
+│   ├── meeting_scheduler.py    # APScheduler & JSON schedule persistence
+│   └── schedule_interface.py   # FastAPI meeting dashboard & REST API
+├── config/
+│   └── meetings.json           # Persistent meeting schedules storage
+├── requirements.txt            # Python dependencies
+├── .env.example                # Environment variables template
+├── .gitignore                  # Git ignore rules (protects credentials & profile)
+└── README.md                   # Project documentation
+```
 
 ---
 
@@ -153,65 +211,65 @@ jarvis-assistant/
 
 ### Environment Variables
 
-Copy \`.env.example\` to \`.env\` and configure:
+Copy `.env.example` to `.env` and configure:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| \`WEATHER_API_KEY\` | Optional | OpenWeatherMap API key for weather features |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `WEATHER_API_KEY` | Optional | - | OpenWeatherMap API key for weather data |
+| `GEMINI_API_KEY` | Optional | - | Google Gemini API key for smart intent parsing |
+| `GROQ_API_KEY` | Optional | - | Groq API key for ultra-fast Llama 3.1 Q&A responses |
+| `MEETING_DASHBOARD_PORT` | Optional | `5050` | Port for the local meeting web interface |
+| `MEETING_DASHBOARD_HOST` | Optional | `127.0.0.1` | Host address for the meeting web interface |
+| `JARVIS_FORCE_ONLINE` | Optional | `false` | Force online mode if internet check gives false negatives |
 
 ### Customization
 
-You can customize JARVIS behavior in \`core.py\`:
+You can customize JARVIS settings in `core.py`:
 
-- **Speech Rate:** Adjust \`engine.setProperty('rate', 175)\`
-- **Voice:** Change voice selection in the \`__init__\` method
-- **Listening Timeout:** Modify \`timeout\` and \`phrase_time_limit\` in \`listen()\`
-
----
-
-## Security
-
-- **Never commit your \`.env\` file** - it contains private API keys
-- The \`.env\` file is automatically ignored by Git (see \`.gitignore\`)
-- Use \`.env.example\` as a template for other developers
+- **Voice & Speech Engine:** Configure `edge-tts` voice (e.g., `en-GB-RyanNeural` or `en-US-GuyNeural`) or fallback `pyttsx3`
+- **Speech Rate:** Adjust speech properties in `core.py`
+- **Listening Timeout:** Modify `timeout` and `phrase_time_limit` parameters in `listen()`
 
 ---
 
 ## Technologies Used
 
-| Technology | Purpose | Free Tier |
-|------------|---------|-----------|
-| **Python 3.7+** | Core language | Free |
-| **SpeechRecognition** | Speech-to-text | Free |
-| **pyttsx3** | Text-to-speech | Free |
-| **Google Gemini** | AI language model | 1,500 req/day |
-| **OpenWeatherMap** | Weather data | 1,000 calls/day |
-| **requests** | HTTP requests | Free |
-| **python-dotenv** | Environment management | Free |
-
-**Total cost to run: $0** (with free tiers)
+| Technology | Purpose | Free Tier / License |
+|------------|---------|---------------------|
+| **Python 3.8+** | Core programming language | Open Source |
+| **Playwright** | Browser automation for Meet & Teams | Open Source |
+| **APScheduler** | Robust in-process background scheduling | Open Source |
+| **FastAPI & Uvicorn** | Meeting dashboard web app and REST API | Open Source |
+| **Google Gemini** | Natural language intent classification | 1,500 req/day |
+| **Groq (Llama 3.1)** | Low-latency conversational Q&A | 14,400 req/day |
+| **edge-tts / pyttsx3** | High-quality neural and offline speech synthesis | Free / Open Source |
+| **SpeechRecognition** | Voice command recognition (Google Speech API) | Free |
+| **OpenWeatherMap** | Real-time weather data | 1,000 calls/day |
 
 ---
 
-## License
+## Security & Privacy
 
-This project is open source and available under the MIT License.
+- **Protected Credentials**: Never commit your `.env` file or `.browser_profile/` directory. Both are listed in `.gitignore`.
+- **Local Storage**: Meeting details and browser cookies are stored exclusively on your local machine (`config/meetings.json` and `.browser_profile/`).
 
 ---
 
 ## Contributing
 
 Contributions are welcome! Feel free to:
-- Report bugs
-- Suggest new features
+- Report bugs and edge cases
+- Suggest new integrations or voice commands
 - Submit pull requests
+
+---
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
 ## Acknowledgments
 
-Inspired by J.A.R.V.I.S. from the Marvel Cinematic Universe's Iron Man series.
-
----
-
-**Made with Python**
+Inspired by J.A.R.V.I.S. from Marvel's Iron Man.

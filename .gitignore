@@ -42,3 +42,10 @@ ENV/
 # testing scripts
 test_weather.py
 
+
+# Meeting Bot - persistent browser profile (contains login cookies)
+.browser_profile/
+
+# Meeting schedule data (user-specific)
+config/meetings.json
+
