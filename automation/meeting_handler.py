@@ -15,9 +15,14 @@ import webbrowser
 from datetime import datetime
 
 # Import meeting sub-modules
-from modules.meeting_scheduler import MeetingScheduler
-from modules.meeting_bot import MeetingBot, PLAYWRIGHT_AVAILABLE
-from modules.schedule_interface import ScheduleInterface, FASTAPI_AVAILABLE
+try:
+    from automation.meeting_scheduler import MeetingScheduler
+    from automation.meeting_bot import MeetingBot, PLAYWRIGHT_AVAILABLE
+    from automation.schedule_interface import ScheduleInterface, FASTAPI_AVAILABLE
+except ImportError:
+    from modules.meeting_scheduler import MeetingScheduler
+    from modules.meeting_bot import MeetingBot, PLAYWRIGHT_AVAILABLE
+    from modules.schedule_interface import ScheduleInterface, FASTAPI_AVAILABLE
 
 
 class MeetingHandler:
@@ -38,7 +43,7 @@ class MeetingHandler:
         if FASTAPI_AVAILABLE:
             self.dashboard.start()
 
-        print("[✓] Meeting attendant module ready")
+        print("[OK] Meeting attendant module ready")
 
     # ─── Voice Commands ───────────────────────────────────────────
 

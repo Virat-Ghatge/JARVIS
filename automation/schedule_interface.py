@@ -259,12 +259,17 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       const f=new FormData(e.target);
       const start=f.get('start_time');
       const dur=parseInt(f.get('duration'))||60;
-      const endDt=new Date(new Date(start).getTime()+dur*60000);
+      const [datePart, timePart] = start.split('T');
+      const [y, m, d] = datePart.split('-').map(Number);
+      const [hr, mn] = timePart.split(':').map(Number);
+      const endDt = new Date(y, m - 1, d, hr, mn + dur);
+      const pad = n => String(n).padStart(2, '0');
+      const endTimeLocal = `${endDt.getFullYear()}-${pad(endDt.getMonth() + 1)}-${pad(endDt.getDate())}T${pad(endDt.getHours())}:${pad(endDt.getMinutes())}:00`;
       const body={
         title:f.get('title'),
         meeting_url:f.get('meeting_url'),
         start_time:start+':00',
-        end_time:endDt.toISOString().slice(0,19),
+        end_time:endTimeLocal,
       };
       const res=await fetch('/api/meetings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if(res.ok){toast('Meeting added!');e.target.reset();loadTimeline();}
@@ -381,6 +386,8 @@ class ScheduleInterface:
             try:
                 start = datetime.fromisoformat(data["start_time"])
                 end = datetime.fromisoformat(data["end_time"]) if data.get("end_time") else None
+                if end and end <= start:
+                    end = start + timedelta(hours=1)
                 meeting = self.scheduler.add_meeting(
                     title=data.get("title", "Untitled Meeting"),
                     meeting_url=data["meeting_url"],

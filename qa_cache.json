@@ -82,5 +82,9 @@
   "what does it mean": {
     "answer": "A rather vague inquiry, sir. Could you please provide more context or clarify what you would like me to explain? I'm at your service, ready to shed light on any topic you'd like to discuss.",
     "timestamp": 1784392885.1958168
+  },
+  "who was albert einstein": {
+    "answer": "Albert Einstein was a theoretical physicist whose work on the theory of relativity fundamentally changed our understanding of space, time, and gravity. By the way, sir, his equation E=mc\u00b2 is arguably the most famous formula in history, though I suspect you already knew that.",
+    "timestamp": 1791797713.5041611
   }
 }

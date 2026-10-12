@@ -65,6 +65,14 @@ class MeetingScheduler:
         if APSCHEDULER_AVAILABLE:
             self.scheduler = BackgroundScheduler(daemon=True)
             self.scheduler.start()
+            # Register periodic poller to catch imminent/due meetings every 10s
+            self.scheduler.add_job(
+                func=self._poll_and_trigger_due_meetings,
+                trigger="interval",
+                seconds=10,
+                id="meeting_poll_daemon",
+                replace_existing=True,
+            )
             # Re-schedule all future pending meetings that were persisted
             self._reschedule_all_pending()
 
@@ -93,7 +101,7 @@ class MeetingScheduler:
                     auto_leave: bool = True) -> dict:
         """Add a new meeting and schedule its trigger."""
         platform = self._detect_platform(meeting_url)
-        if end_time is None:
+        if end_time is None or end_time <= start_time:
             end_time = start_time + timedelta(hours=1)
 
         meeting = {
@@ -224,10 +232,19 @@ class MeetingScheduler:
             return
 
         start = datetime.fromisoformat(meeting["start_time"])
+        end = datetime.fromisoformat(meeting["end_time"]) if meeting.get("end_time") else start + timedelta(hours=1)
+        now = datetime.now()
         trigger_time = start - timedelta(seconds=60)
 
-        # Don't schedule past events
-        if trigger_time <= datetime.now():
+        # Don't schedule past events that are completely over
+        if now >= end:
+            return
+
+        # If meeting is starting now, imminent, or already in progress: trigger immediately
+        if trigger_time <= now < end:
+            if meeting.get("status") == "pending":
+                print(f"[Scheduler] Meeting '{meeting['title']}' is starting now or in progress -- auto-joining immediately!")
+                threading.Thread(target=self._trigger_join, args=[meeting], daemon=True).start()
             return
 
         self.scheduler.add_job(
@@ -236,9 +253,33 @@ class MeetingScheduler:
             id=f"meeting_{meeting['id']}",
             args=[meeting],
             replace_existing=True,
-            misfire_grace_time=120,
+            misfire_grace_time=300,
         )
         print(f"[Scheduler] Trigger set for '{meeting['title']}' at {trigger_time.strftime('%H:%M:%S')}")
+
+    def _poll_and_trigger_due_meetings(self):
+        """Periodic poller running every 10s ensuring imminent or due meetings are never missed."""
+        if not self.meeting_bot:
+            return
+        now = datetime.now()
+        with self._lock:
+            # Refresh from disk
+            self._load()
+            for m in list(self._meetings):
+                if m.get("status") == "pending":
+                    try:
+                        start = datetime.fromisoformat(m["start_time"])
+                        end = datetime.fromisoformat(m["end_time"]) if m.get("end_time") else start + timedelta(hours=1)
+                        if now >= end:
+                            m["status"] = "completed"
+                            self._save()
+                        elif (start - timedelta(seconds=60)) <= now < end:
+                            if self.meeting_bot.is_in_meeting():
+                                continue
+                            print(f"[Scheduler Poller] Auto-joining due meeting: '{m['title']}'")
+                            threading.Thread(target=self._trigger_join, args=[m], daemon=True).start()
+                    except Exception as e:
+                        pass
 
     def _reschedule_all_pending(self):
         """Re-register triggers for all future pending meetings (on startup)."""
@@ -246,13 +287,16 @@ class MeetingScheduler:
             self._schedule_trigger(m)
 
     def _trigger_join(self, meeting: dict):
-        """Callback fired by APScheduler — launches the Playwright bot."""
-        if meeting["status"] != "pending":
-            return
-        print(f"\n[Scheduler] ▶ Auto-joining '{meeting['title']}'")
-        self.mark_active(meeting["id"])
+        """Callback fired by APScheduler or poller — launches the Playwright bot."""
+        with self._lock:
+            if meeting.get("status") != "pending":
+                return
+            meeting["status"] = "active"
+            self._save()
+
+        print(f"\n[Scheduler] [>] Auto-joining '{meeting['title']}'")
         try:
-            end_time = datetime.fromisoformat(meeting["end_time"])
+            end_time = datetime.fromisoformat(meeting["end_time"]) if meeting.get("end_time") else None
             self.meeting_bot.join_meeting(
                 url=meeting["meeting_url"],
                 end_time=end_time,

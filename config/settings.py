@@ -24,10 +24,12 @@ ASSETS_DIR = UI_DIR / "assets"
 STYLES_FILE = UI_DIR / "styles.qss"
 QA_CACHE_FILE = BASE_DIR / "qa_cache.json"
 
-# API Keys
+# API Keys & LLM Models
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 
 # Meeting Attendant & Web Dashboard
 MEETING_DASHBOARD_PORT = int(os.getenv("MEETING_DASHBOARD_PORT", "5050"))

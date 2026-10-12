@@ -13,7 +13,11 @@ import os
 import re
 import time
 
-CACHE_FILE = os.path.join(os.path.dirname(__file__), "qa_cache.json")
+try:
+    from config.settings import QA_CACHE_FILE
+    CACHE_FILE = str(QA_CACHE_FILE)
+except Exception:
+    CACHE_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "qa_cache.json")
 CACHE_TTL = 86400  # 24 hours
 
 # Question starters that trigger this handler
@@ -28,8 +32,14 @@ QUESTION_STARTERS = [
     'define ', 'tell me about', 'explain ',
 ]
 
-# Groq model to use — llama-3.1-8b-instant is fastest with 14,400 req/day free
-GROQ_MODEL = "llama-3.1-8b-instant"
+try:
+    from config.settings import GROQ_MODEL, GEMINI_MODEL
+except ImportError:
+    GROQ_MODEL = "qwen/qwen3.8-27b"
+    GEMINI_MODEL = "gemini-2.5-flash"
+
+# Primary & fallback Groq models
+GROQ_MODELS_POOL = [GROQ_MODEL, "qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "allam-2-7b"]
 
 # JARVIS persona prompt for Groq
 SYSTEM_PROMPT = (
@@ -75,7 +85,7 @@ class QAHandler:
 
         try:
             client = Groq(api_key=api_key)
-            print("[✓] Groq Q&A Engine ready (llama-3.1-8b-instant)")
+            print(f"[OK] Groq Q&A Engine ready ({GROQ_MODEL})")
             return client
         except Exception as e:
             print(f"[QA] Groq init failed: {e}")
@@ -138,54 +148,68 @@ class QAHandler:
     # ------------------------------------------------------------------ #
 
     def _ask_groq(self, query):
-        """Send query to Groq (Llama 3.1) and return answer string or None."""
+        """Send query to Groq and return answer string or None."""
         if not self.groq_client:
             return None
 
-        try:
-            response = self.groq_client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user",   "content": query},
-                ],
-                temperature=0.3,
-                max_tokens=150,
-            )
-            answer = response.choices[0].message.content.strip()
-            answer = re.sub(r'\*+', '', answer)
-            answer = re.sub(r'#+\s*', '', answer)
-            return answer if answer else None
+        # Try models from pool for maximum resilience
+        for model_name in GROQ_MODELS_POOL:
+            try:
+                response = self.groq_client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user",   "content": query},
+                    ],
+                    temperature=0.3,
+                    max_tokens=150,
+                )
+                answer = response.choices[0].message.content.strip()
+                answer = re.sub(r'\*+', '', answer)
+                answer = re.sub(r'#+\s*', '', answer)
+                if answer:
+                    return answer
+            except Exception as e:
+                err_str = str(e).lower()
+                if "model_not_found" in err_str or "does not exist" in err_str:
+                    continue  # Try next model in pool
+                elif "429" in err_str or "rate limit" in err_str:
+                    raise  # Let caller catch rate limit and switch to Gemini
+                print(f"[QA] Groq error ({model_name}): {e}")
 
-        except Exception as e:
-            print(f"[QA] Groq error: {e}")
-            return None
+        return None
 
     def _ask_gemini(self, query):
         """Send query to Gemini and return answer string or None."""
         if not hasattr(self.jarvis, 'genai_client') or not self.jarvis.ai_model:
             return None
 
-        try:
-            prompt = (
-                "You are JARVIS, Tony Stark's AI. Answer the question below concisely "
-                "in 1-2 sentences. Be formal, address the user as 'sir'. "
-                "Plain text only — no markdown, no bullet points.\n\n"
-                f"Question: {query}\nAnswer:"
-            )
-            response = self.jarvis.genai_client.models.generate_content(
-                model=self.jarvis.ai_model,
-                contents=prompt,
-                config={'temperature': 0.3, 'max_output_tokens': 150}
-            )
-            answer = response.text.strip()
-            answer = re.sub(r'\*+', '', answer)
-            answer = re.sub(r'#+\s*', '', answer)
-            return answer if answer else None
+        gemini_models = [self.jarvis.ai_model, "gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]
+        for g_model in [m for m in gemini_models if m]:
+            try:
+                prompt = (
+                    "You are JARVIS, Tony Stark's AI. Answer the question below concisely "
+                    "in 1-2 sentences. Be formal, address the user as 'sir'. "
+                    "Plain text only — no markdown, no bullet points.\n\n"
+                    f"Question: {query}\nAnswer:"
+                )
+                response = self.jarvis.genai_client.models.generate_content(
+                    model=g_model,
+                    contents=prompt,
+                    config={'temperature': 0.3, 'max_output_tokens': 150}
+                )
+                answer = response.text.strip()
+                answer = re.sub(r'\*+', '', answer)
+                answer = re.sub(r'#+\s*', '', answer)
+                if answer:
+                    return answer
+            except Exception as e:
+                err_str = str(e).lower()
+                if "not found" in err_str or "404" in err_str:
+                    continue
+                print(f"[QA] Gemini error ({g_model}): {e}")
 
-        except Exception as e:
-            print(f"[QA] Gemini error: {e}")
-            return None
+        return None
 
     # ------------------------------------------------------------------ #
     def _is_rate_limited(self, error):
