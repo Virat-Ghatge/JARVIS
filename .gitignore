@@ -49,3 +49,10 @@ test_weather.py
 # Meeting schedule data (user-specific)
 config/meetings.json
 
+# Node & Frontend Build
+node_modules/
+ui/node_modules/
+ui/dist/
+*.repomix.txt
+jarvis-repomix.txt
+

@@ -1,9 +1,9 @@
-# JARVIS Desktop AI Assistant
+# JARVIS 2.0 — Autonomous OS Agent & Holographic HUD
 
 > **Just A Rather Very Intelligent System**  
-> Standalone Desktop GUI Application with PySide6, Neural Voice, Dual Audio Interlocking, and Autonomous Meeting Attendant.
+> Autonomous AI Agent with Marvel Arc-Cyan Holographic HUD, FastAPI + WebSocket Engine, Multi-Key Dynamic Vault, 3-Tier OS Actuator, and Playwright Meeting Attendant.
 
-JARVIS is a Python desktop voice and text assistant inspired by Tony Stark's AI companion from Iron Man. Re-architected with a modular system design, a native PySide6 dark HUD desktop interface, unified InputGateway routing, independent dual audio state controls, and headed meeting automation for Google Meet and Microsoft Teams.
+JARVIS 2.0 is an autonomous desktop OS agent and voice/text companion inspired by Tony Stark's AI assistant from Iron Man. Featuring a React + Vite + Tailwind CSS tactical HUD served inside a native PyWebView desktop container, sub-second local deterministic triage, autonomous 3-tier OS action engine, Model Context Protocol (MCP) tool integration, live meeting captions with AI summaries, and multi-provider LLM failover routing.
 
 ---
 
@@ -11,25 +11,23 @@ JARVIS is a Python desktop voice and text assistant inspired by Tony Stark's AI 
 
 ```
 +-----------------------------------------------------------------------------------------+
-| [J.A.R.V.I.S.] INTELLIGENT SYSTEM ARCHITECTURE       [ONLINE]  [MEETING DASHBOARD :5050] |
+| [J.A.R.V.I.S. 2.0] HOLOGRAPHIC TACTICAL HUD            [ONLINE]  [CORE STATUS: OPTIMAL] |
 +-----------------------------------------------------------------------------------------+
-| [MIC: MUTED / LISTENING]  [VOICE: ACTIVE / MUTED]  Status: Ready          [Clear Chat]  |
+| [MIC: MUTED / ACTIVE]  [TTS: ACTIVE / SILENT]  [TRUST MODE: ON/OFF]   [MINI-HUD GHOST]  |
 +-------------------------------------------------------------+---------------------------+
-|                                                             |    SYSTEM TELEMETRY       |
-|  YOU [TEXT]                                                 |                           |
-|  "What time is it?"                                         |    [ CPU LOAD: 14.2% ]    |
-|                                                             |    [ RAM USAGE: 42.1% ]   |
-|  J.A.R.V.I.S. [TEXT]                                        |    [ BATTERY: 95% AC ]    |
-|  "The current time is 02:35 PM, sir."                       |                           |
-|                                                             |   NEXT SCHEDULED MEETING  |
-|  YOU [VOICE]                                                |   "Team Sprint Sync"      |
-|  "What meetings do I have today?"                           |   Today at 3:00 PM        |
-|                                                             |   [ Join Now Button ]     |
-|  J.A.R.V.I.S. [VOICE]                                       |                           |
-|  "You have 1 upcoming meeting: Team Sprint Sync at 3:00 PM"|                           |
+| TABS: [CHAT STREAM] [OS AGENT] [MEETINGS] [API VAULT]       |    ARC TELEMETRY GAUGES   |
+|       [SKILLS & MCP] [SYSTEM & ALARMS]                      |                           |
+|                                                             |    ( CPU LOAD: 14.2% )    |
+|  YOU [TEXT / VOICE]                                         |    ( RAM USAGE: 42.1% )   |
+|  "Open Chrome and navigate to GitHub"                       |    ( BATTERY: 95% AC )    |
+|                                                             |                           |
+|  J.A.R.V.I.S. [TIER 1/3 ACTUATOR]                           |   NEXT SCHEDULED MEETING  |
+|  "Launching Chrome and navigating to repository, sir."      |   "Team Sprint Sync"      |
+|                                                             |   Today at 3:00 PM        |
+|  [SET-OF-MARK VISION PREVIEW: Active Arc Cyan Tags]         |   [ Join Now Button ]     |
 |                                                             |                           |
 +-------------------------------------------------------------+---------------------------+
-| [Type a command or query...                                          ]  [ EXECUTE ]     |
+| [Type a command, query, or script...                                 ]  [ EXECUTE ]     |
 +-----------------------------------------------------------------------------------------+
 ```
 
@@ -39,16 +37,16 @@ JARVIS is a Python desktop voice and text assistant inspired by Tony Stark's AI 
 
 | Feature | Description |
 |---------|-------------|
-| **Native PySide6 Desktop GUI** | Sleek Iron Man-inspired dark HUD interface (`#0b0f19` slate, electric cyan accents) launched by default |
-| **Independent Dual Audio Controls**| Discrete toggles for **Mic In** (voice listening) and **TTS Out** (spoken speech) |
-| **Meeting-Aware Auto-Mute** | Automatically mutes microphone when joining meetings to prevent audio loops; supports manual override |
-| **Unified InputGateway** | Uniform routing for text and voice commands through local handlers, meeting engines, and LLMs |
-| **Automated Meeting Attendant** | Headed browser automation (Playwright/Chrome) auto-joins Google Meet & Teams with mic/cam muted and auto-leaves |
-| **Meeting Web Dashboard** | Integrated web dashboard at `http://localhost:5050` with quick-add forms, timeline, and bulk import |
-| **Hybrid LLM Intelligence** | Sub-second local execution for commands; Groq (Llama 3.1) and Gemini for natural language Q&A |
-| **Live System Telemetry** | Real-time monitoring of CPU load, RAM usage, battery levels, and upcoming meeting notifications |
-| **Cross-Platform Shortcut** | Built-in script to generate clickable desktop launchers for Windows, Linux, and macOS |
-| **Offline-First Fallback** | Clock, app launching, audio volume, display brightness, alarms, and local meeting agendas work 100% offline |
+| **Marvel Holographic HUD** | Pure geometric Arc Cyan (`#00E5FF`) and Reactor Gold HUD built with React, Vite, and Tailwind CSS |
+| **Native PyWebView Container** | Frameless, modern native desktop window with browser fallback at `http://127.0.0.1:5050` |
+| **FastAPI + WebSocket Engine** | Real-time bi-directional telemetry and command streaming on port 5050 |
+| **Multi-Key API Vault** | Hot-swappable key rotation across Gemini, Groq, Anthropic, OpenRouter, and Ollama with custom OpenAI endpoints |
+| **3-Tier Dynamic OS Agent** | Tier 1 Safe Sandboxed Python, Tier 2 MCP Tools, and Tier 3 Set-of-Mark (SoM) Vision Actuator |
+| **Safety Interceptor** | Cryptographic confirmation prompts with countdown timer for potentially destructive OS actions |
+| **Automated Meeting Attendant** | Headed Playwright browser attendant with live caption feed, auto-mute interlock, and AI post-meeting summaries |
+| **Workspace RAG & Copilot** | Local codebase indexing, semantic search, and clipboard summarization/bug fixing |
+| **Custom Voice Skills & MCP** | Interactive "Teach Mode" voice macro recorder and dynamic MCP server registry |
+| **Cross-Platform Shortcut** | One-click desktop launcher generator for Windows (.lnk & .bat), Linux (.desktop), and macOS |
 
 ---
 
@@ -56,86 +54,53 @@ JARVIS is a Python desktop voice and text assistant inspired by Tony Stark's AI 
 
 ### 1. Prerequisites
 
-- **Python 3.8+** (Python 3.10+ recommended)
-- **Google Chrome** installed (for persistent-session meeting automation)
+- **Python 3.10+**
+- **Node.js 18+** & npm (for UI compilation)
+- **Google Chrome** installed (for meeting automation)
 - Microphone and speakers/headphones
 
 ### 2. Installation
 
-Clone the repository and install dependencies:
-
 ```bash
-git clone https://github.com/yourusername/jarvis-assistant.git
-cd jarvis-assistant
+git clone https://github.com/yourusername/JARVIS.git
+cd JARVIS
 
+# Python dependencies
 pip install -r requirements.txt
 python -m playwright install chromium
+
+# Frontend HUD build
+cd ui
+npm install
+npm run build
+cd ..
 ```
 
-*PyAudio setup notes (if needed):*
-- **Windows:** Included in `requirements.txt` (or `pip install pipwin && pipwin install pyaudio`)
-- **macOS:** `brew install portaudio && pip install pyaudio`
-- **Linux:** `sudo apt-get install python3-pyaudio`
+### 3. Launch Modes
 
-### 3. One-Time Browser Authentication (For Meetings)
-
-To enable friction-free auto-join for Google Meet and Microsoft Teams without repeating 2FA:
-```bash
-python -m automation.meeting_bot --setup
-```
-Signs you into Google and Microsoft accounts within Chrome and saves your session locally into `.browser_profile/`.
-
-### 4. Configure Environment Variables
-
-```bash
-cp .env.example .env
-```
-Edit `.env` to configure your API keys:
-```env
-WEATHER_API_KEY=your_weather_api_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
-GROQ_API_KEY=your_groq_api_key_here
-
-MEETING_DASHBOARD_PORT=5050
-MEETING_DASHBOARD_HOST=127.0.0.1
-```
-- [Get Weather API key](https://openweathermap.org/api)
-- [Get Gemini API key (free)](https://aistudio.google.com/app/apikey)
-- [Get Groq API key (free)](https://console.groq.com)
-
----
-
-## Launch Modes
-
-### Default: Desktop GUI Mode
-
-Simply run `main.py` without flags:
+#### Default: Native Desktop Holographic HUD
 ```bash
 python main.py
 ```
-Launches the full PySide6 desktop HUD application with asynchronous command processing.
+Launches the FastAPI backend and opens the native PyWebView frameless window (1360x860) with auto-fallback to `http://127.0.0.1:5050`.
 
-### Fallback: CLI / Terminal Mode
-
-To run in headless or terminal-only environments:
+#### Headless / Terminal CLI Mode
 ```bash
 python main.py --cli
 ```
-Optional silent flag (suppresses spoken voice output):
-```bash
-python main.py --cli --silent
-```
+Runs in terminal-only mode for command-line operators (type commands, `exit` to quit).
 
 ---
 
-## Generating Desktop Application Icon
+## Generating Desktop Application Icon & Shortcut
 
-To generate a clickable desktop shortcut/launcher on your desktop:
+To programmatically generate the geometric Arc-Cyan HUD icon (`jarvis.png` / `jarvis.ico`) and install native desktop launchers:
 
 ```bash
 python scripts/create_desktop_icon.py
 ```
 
+- **Arc-Cyan HUD Icon:** Programmatically rendered via Pillow at 1024x1024 supersampling with concentric segmented arcs, tick-marks, and central reactor core (`ui/assets/jarvis.ico` and `ui/assets/jarvis.png`).
 - **Windows:** Creates `JARVIS Assistant.lnk` and `Launch JARVIS.bat` on your Desktop with the custom icon.
 - **Linux:** Creates `jarvis.desktop` on your Desktop and installs it into `~/.local/share/applications/`.
 - **macOS:** Creates `JARVIS.command` on your Desktop with executable permissions.

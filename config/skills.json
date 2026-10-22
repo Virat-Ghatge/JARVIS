@@ -1,0 +1,42 @@
+[
+  {
+    "id": "skill-work-mode",
+    "name": "Start Work Mode",
+    "trigger_phrases": [
+      "start work mode",
+      "work mode",
+      "begin work"
+    ],
+    "steps": [
+      "open browser",
+      "check system status",
+      "what is the time"
+    ]
+  },
+  {
+    "id": "skill-sys-diagnostics",
+    "name": "System Diagnostics Report",
+    "trigger_phrases": [
+      "run system diagnostics",
+      "system diagnostics report",
+      "diagnostics"
+    ],
+    "steps": [
+      "check system status",
+      "check battery"
+    ]
+  },
+  {
+    "id": "skill-focus-mode",
+    "name": "Focus Mode",
+    "trigger_phrases": [
+      "focus mode",
+      "start focus mode",
+      "enter focus"
+    ],
+    "steps": [
+      "mute volume",
+      "tell me the time"
+    ]
+  }
+]

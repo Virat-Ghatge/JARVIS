@@ -1,22 +1,25 @@
-"""Handlers package for JARVIS command execution."""
-from .date_time import DateTimeHandler
-from .applications import ApplicationHandler
-from .music import MusicHandler
-from .web_search import WebSearchHandler
-from .alarm import AlarmHandler
-from .weather import WeatherHandler
-from .system_controls import SystemControls
-from .system_info import SystemInfoHandler
-from .qa_handler import QAHandler
+"""
+Backward-compatibility shims for JARVIS handlers.
+Canonical locations are integrations.handlers.*
+"""
+from integrations.handlers.alarm import AlarmHandler
+from integrations.handlers.applications import ApplicationHandler
+from integrations.handlers.date_time import DateTimeHandler
+from integrations.handlers.music import MusicHandler
+from integrations.handlers.qa_handler import QAHandler
+from integrations.handlers.system_controls import SystemControls
+from integrations.handlers.system_info import SystemInfoHandler
+from integrations.handlers.weather import WeatherHandler
+from integrations.handlers.web_search import WebSearchHandler
 
 __all__ = [
-    "DateTimeHandler",
-    "ApplicationHandler",
-    "MusicHandler",
-    "WebSearchHandler",
     "AlarmHandler",
-    "WeatherHandler",
+    "ApplicationHandler",
+    "DateTimeHandler",
+    "MusicHandler",
+    "QAHandler",
     "SystemControls",
     "SystemInfoHandler",
-    "QAHandler",
+    "WeatherHandler",
+    "WebSearchHandler",
 ]

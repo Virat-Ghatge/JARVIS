@@ -1,0 +1,41 @@
+# ROADMAP: JARVIS 2.0 Autonomous Engineering Loops
+
+- [ ] **Loop 0: GSD Initialization & Clean Directory Refactoring**
+  - Project spec and state files (`PROJECT.md`, `ROADMAP.md`, `STATE.md`, `LOOP_STATE.md`)
+  - Target directory structure setup and legacy code migration
+  - Module verification test `tests/test_loop0_structure.py`
+- [ ] **Loop 1: Multi-Key API Vault, Custom OpenAI Adapter & Role Router**
+  - Settings manager with `.env` seeding and `config/api_vault.json` persistence
+  - Adapter architecture (`base.py`, `gemini_adapter.py`, `groq_adapter.py`, `anthropic_adapter.py`, `openai_compat.py`)
+  - Multi-key rotation, failover, telemetry, and role dispatching in `core/llm_router.py`
+  - Verification test `tests/test_loop1_vault.py`
+- [ ] **Loop 2: Independent Audio State Machine, Meeting Interlock & Unified Input Gateway**
+  - Unified TTS engine with `tts_active` toggle in `audio/tts_engine.py`
+  - Thread-safe Voice listener with `mic_active` toggle, meeting auto-mute & manual override in `audio/voice_listener.py`
+  - Unified `InputGateway` in `core/engine.py` with deterministic & LLM triage
+  - Verification test `tests/test_loop2_audio_engine.py`
+- [ ] **Loop 3: 3-Tier Dynamic OS Agent & Safety Interceptor**
+  - Risk analyzer & Approval Modal gatekeeper in `agent_os/safety_interceptor.py`
+  - Tier 1: Dynamic Python & Shell Code Synthesizer (`agent_os/code_executor.py`)
+  - Tier 3: SoM Vision, UI Distiller, Actuator with `[ESC]` kill-switch, and State Machine
+  - Verification test `tests/test_loop3_agent_os.py`
+- [ ] **Loop 4: MCP Client, Skills/Teach Mode, Clipboard Copilot, Workspace RAG & Smart Meetings**
+  - Tier 2 MCP Client Hub (`integrations/mcp_client.py`)
+  - Skills store, macros, and Teach Mode (`integrations/skill_store.py`)
+  - Clipboard Copilot (`integrations/handlers/clipboard_copilot.py`) and Workspace RAG (`integrations/workspace_rag.py`)
+  - Smart Meeting Attendant 2.0 with caption scraping and AI summary (`automation/meeting_bot.py`)
+  - Autonomous Web Researcher (`automation/web_agent.py`)
+  - Verification test `tests/test_loop4_integrations.py`
+- [ ] **Loop 5: FastAPI + WebSocket Server & Marvel JARVIS Holographic HUD (React/Tailwind)**
+  - Backend server (`automation/server.py`) with REST + WebSocket event contract
+  - Modern React + Vite + Tailwind frontend in `ui/` with Marvel HUD aesthetic and zero logos
+  - All 6 panels + mini-HUD mode + Approval Modal + token telemetry
+  - Build frontend bundle to `ui/dist`
+- [ ] **Loop 6: Native Desktop App Wrapper (PyWebView), Clickable Desktop Icon & DevTools Audit**
+  - Desktop wrapper in `main.py` with PyWebView and Chrome app fallback
+  - Geometric Arc-Cyan HUD icon generator and desktop shortcut creator in `scripts/create_desktop_icon.py`
+  - Autonomous live verification with Chrome DevTools MCP & a11y auditing
+- [ ] **Loop 7: Memory Audit, Dependency Freeze & Comprehensive Documentation**
+  - Memory leak verification on WebSockets and background loops
+  - `requirements.txt`, `.env.example`, and updated `README.md`
+  - Full automated test suite execution across all loops

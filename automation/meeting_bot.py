@@ -13,11 +13,13 @@ One-time setup:
 """
 
 import os
+import sys
 import time
 import threading
 import re
 import urllib.parse
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 # Playwright
 try:
@@ -67,6 +69,11 @@ class MeetingBot:
         # Callbacks for meeting-aware audio interlocking & UI notifications
         self.on_meeting_joined = None
         self.on_meeting_left = None
+
+        # Live Caption Feed & Meeting State
+        self.live_captions: list = []
+        self._seen_captions: set = set()
+        self.current_meeting: dict = None
 
     # ─── Lifecycle ────────────────────────────────────────────────
 
@@ -131,20 +138,27 @@ class MeetingBot:
     # ─── Join Meeting ─────────────────────────────────────────────
 
     def join_meeting(self, url: str, end_time: datetime = None,
-                     auto_leave: bool = True):
+                     auto_leave: bool = True, title: str = "Online Meeting"):
         """
         Navigate to the meeting URL, disable mic/camera, click Join,
-        and start the monitoring loop.
-
-        This method BLOCKS until the meeting ends (participant count drops
-        below 2, end_time is reached, or leave_meeting() is called externally).
-        Run it in a daemon thread to avoid blocking JARVIS's main loop.
+        and start the monitoring loop with live caption scraping.
         """
         if not PLAYWRIGHT_AVAILABLE:
             print("[MeetingBot] Playwright not installed — cannot join.")
             return
 
         self._should_leave.clear()
+        self.live_captions.clear()
+        self._seen_captions.clear()
+        self.current_meeting = {"title": title, "url": url, "joined_at": datetime.now().isoformat()}
+
+        # Audio interlock: auto-mute JARVIS listening so meeting audio doesn't trigger commands
+        try:
+            from audio.voice_listener import voice_listener
+            voice_listener.on_meeting_state_change(True, meeting_title=title)
+        except Exception as e:
+            print(f"[MeetingBot] Voice interlock notice: {e}")
+
         self._ensure_browser()
 
         platform = self.detect_platform(url)
@@ -171,14 +185,14 @@ class MeetingBot:
                 page.close()
                 return
 
-            # Trigger joined hook for audio interlocking (auto-mute mic)
+            # Trigger joined hook
             if callable(self.on_meeting_joined):
                 try:
                     self.on_meeting_joined(url)
                 except Exception as cb_err:
                     print(f"[MeetingBot] on_meeting_joined callback error: {cb_err}")
 
-            # Start monitoring loop
+            # Start monitoring loop with caption scraping
             if auto_leave:
                 self._monitor_call(page, end_time, platform)
             else:
@@ -186,19 +200,34 @@ class MeetingBot:
                 while not self._should_leave.is_set():
                     if page.is_closed():
                         break
-                    time.sleep(5)
+                    self._scrape_live_captions(page, platform)
+                    time.sleep(3)
 
         except Exception as e:
             print(f"[MeetingBot] Error during meeting: {e}")
         finally:
             self._active_page = None
+            self.current_meeting = None
             try:
                 if not page.is_closed():
                     page.close()
             except Exception:
                 pass
 
-            # Trigger left hook for audio interlocking (auto-restore mic)
+            # Audio interlock: restore mic listening if auto-muted
+            try:
+                from audio.voice_listener import voice_listener
+                voice_listener.on_meeting_state_change(False, meeting_title=title)
+            except Exception:
+                pass
+
+            # Generate AI post-call summary
+            try:
+                self._generate_post_call_summary(title)
+            except Exception as sum_err:
+                print(f"[MeetingBot] Summary generation error: {sum_err}")
+
+            # Trigger left hook
             if callable(self.on_meeting_left):
                 try:
                     self.on_meeting_left(url)
@@ -426,6 +455,10 @@ class MeetingBot:
                         return
                 except Exception:
                     return
+                # Scrape live captions periodically
+                if _ % 3 == 0:
+                    self._scrape_live_captions(page, platform)
+
                 time.sleep(1)
 
             now = datetime.now()
@@ -547,6 +580,120 @@ class MeetingBot:
 
     def is_in_meeting(self) -> bool:
         return self._active_page is not None and not self._active_page.is_closed()
+
+    def get_live_captions(self) -> list:
+        """Return list of captured real-time captions."""
+        return list(self.live_captions)
+
+    def get_summaries(self) -> list:
+        """Load stored post-call summaries."""
+        summaries_file = os.path.join(BASE_DIR, "config", "meeting_summaries.json")
+        if os.path.exists(summaries_file):
+            try:
+                import json
+                with open(summaries_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return []
+
+    def _scrape_live_captions(self, page, platform: str) -> None:
+        """Extract live captions from the meeting DOM nodes."""
+        if not page:
+            return
+        try:
+            if page.is_closed():
+                return
+            raw_texts = []
+            if platform == "google_meet":
+                # Google Meet live caption selectors
+                for sel in ["div[jsname='r4nke']", "div[aria-live='polite'] span", ".iTTPOb"]:
+                    try:
+                        loc = page.locator(sel)
+                        cnt = loc.count()
+                        for i in range(min(5, cnt)):
+                            t = loc.nth(i).inner_text().strip()
+                            if t:
+                                raw_texts.append(t)
+                    except Exception:
+                        pass
+            elif platform == "teams":
+                # Microsoft Teams caption selectors
+                for sel in ["div[data-tid='closed-captions-renderer']", ".ui-chat__item__message", ".fui-ChatMessage"]:
+                    try:
+                        loc = page.locator(sel)
+                        cnt = loc.count()
+                        for i in range(min(5, cnt)):
+                            t = loc.nth(i).inner_text().strip()
+                            if t:
+                                raw_texts.append(t)
+                    except Exception:
+                        pass
+
+            for line in raw_texts:
+                if line and line not in self._seen_captions and len(line) > 3:
+                    self._seen_captions.add(line)
+                    cap_item = {
+                        "text": line,
+                        "timestamp": datetime.now().strftime("%H:%M:%S"),
+                        "platform": platform,
+                    }
+                    self.live_captions.append(cap_item)
+                    print(f"[MeetingBot Caption] {line}")
+        except Exception:
+            pass
+
+    def _generate_post_call_summary(self, title: str) -> Optional[dict]:
+        """Summarizes meeting captions using LLM and stores in config/meeting_summaries.json."""
+        if not self.live_captions:
+            print("[MeetingBot] No captions captured during call.")
+            return None
+
+        transcript = "\n".join(f"[{c['timestamp']}] {c['text']}" for c in self.live_captions)
+        system_prompt = (
+            "You are JARVIS. Summarize the following meeting transcript. "
+            "Structure your output cleanly with:\n"
+            "1. Executive Summary\n"
+            "2. Key Decisions Made\n"
+            "3. Action Items & Next Steps\n"
+        )
+        prompt = f"Meeting: {title}\nTranscript:\n{transcript}"
+
+        try:
+            from core.llm_router import router
+            summary_text = router.query_text("qa_chat", prompt, system_prompt=system_prompt)
+        except Exception as e:
+            summary_text = f"Summary generation unavailable: {e}"
+
+        summary_record = {
+            "id": f"sum-{int(time.time())}",
+            "title": title,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "captions_count": len(self.live_captions),
+            "summary": summary_text,
+        }
+
+        # Save to config/meeting_summaries.json
+        summaries_file = os.path.join(BASE_DIR, "config", "meeting_summaries.json")
+        existing_summaries = []
+        try:
+            import json
+            if os.path.exists(summaries_file):
+                with open(summaries_file, "r", encoding="utf-8") as f:
+                    existing_summaries = json.load(f)
+        except Exception:
+            existing_summaries = []
+
+        existing_summaries.insert(0, summary_record)
+        try:
+            import json
+            with open(summaries_file, "w", encoding="utf-8") as f:
+                json.dump(existing_summaries, f, indent=2)
+            print(f"[MeetingBot] Saved post-call summary for '{title}'")
+        except Exception as e:
+            print(f"[MeetingBot] Error saving summary: {e}")
+
+        return summary_record
 
     # ─── Interactive Setup ────────────────────────────────────────
 

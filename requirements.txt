@@ -1,36 +1,42 @@
-# Desktop GUI Framework (PySide6 / Qt)
+# Desktop GUI & Container
+pywebview>=5.0.0
 PySide6>=6.6.0
 Pillow>=10.0.0
 
-# Speech Recognition & Audio
+# Backend Web Server & Streaming
+fastapi>=0.100.0
+uvicorn>=0.23.0
+websockets>=12.0
+pydantic>=2.0.0
+
+# LLM Providers & Adapters
+google-genai>=1.0.0
+groq>=0.9.0
+openai>=1.0.0
+anthropic>=0.18.0
+
+# Speech Recognition & Audio Synthesis
 SpeechRecognition>=3.10.0
+edge-tts>=6.1.0
 pyttsx3>=2.90
+pygame>=2.5.0
+PyAudio>=0.2.13
+
+# Agent OS Automation & Vision Actuation
+pyautogui>=0.9.54
+mss>=9.0.1
+pyperclip>=1.8.2
+psutil>=5.9.0
+
+# Meeting Automation & Web Scraping
+playwright>=1.40.0
+APScheduler>=3.10.0
 requests>=2.28.0
 beautifulsoup4>=4.12.0
 python-dotenv>=1.0.0
-PyAudio>=0.2.13
 
-# Neural TTS (primary voice engine)
-edge-tts>=6.1.0
-pygame>=2.5.0
-
-# Optional: For AI features (Gemini)
-google-genai>=1.0.0
-
-# Groq API (free LLM for Q&A — llama-3.1-8b-instant)
-groq>=0.9.0
-
-# System Diagnostics & Monitoring
-psutil>=5.9.0
-
-# System Controls (Volume, Brightness on Windows)
+# Windows System Controls
 pycaw>=20230407
 screen-brightness-control>=0.22.0
 pywin32>=306
 comtypes>=1.2.0
-
-# Meeting Attendant (auto-join Google Meet / Teams)
-playwright>=1.40.0
-APScheduler>=3.10.0
-fastapi>=0.100.0
-uvicorn>=0.23.0

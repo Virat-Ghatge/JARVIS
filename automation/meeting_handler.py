@@ -39,8 +39,8 @@ class MeetingHandler:
             meeting_bot=self.bot,
         )
 
-        # Start the web dashboard in a daemon thread
-        if FASTAPI_AVAILABLE:
+        # Start the web dashboard only if explicitly requested by legacy caller
+        if FASTAPI_AVAILABLE and getattr(self.jarvis, "start_legacy_dashboard", False):
             self.dashboard.start()
 
         print("[OK] Meeting attendant module ready")

@@ -1,103 +1,98 @@
 #!/usr/bin/env python3
 """
 JARVIS Core Engine & Unified Input Gateway
-Orchestrates command processing across local rules, scheduled meeting automation,
-Gemini NLP classification, and Groq conversational Q&A.
+Orchestrates hybrid voice + text command routing across fast deterministic local handlers,
+skill macros, meeting automation, and 3-tier autonomous LLM dispatch.
 """
 
+import json
 import os
 import random
 import re
-import socket
 import threading
 import time
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# Configuration
+# Settings & Vault
 from config.settings import (
-    WEATHER_API_KEY,
-    GEMINI_API_KEY,
-    GROQ_API_KEY,
-    GROQ_MODEL,
-    GEMINI_MODEL,
-    JARVIS_FORCE_ONLINE,
+    BASE_DIR,
+    SKILLS_FILE,
+    get_active_key,
+    load_vault,
+    is_internet_connected,
 )
 
-# TTS Engine
-from core.tts_engine import TTSEngine
+# Audio State Machine
+from audio.tts_engine import TTSEngine, tts_engine as default_tts
+from audio.voice_listener import VoiceListener, voice_listener as default_listener
 
-# Handlers
-from handlers.date_time import DateTimeHandler
-from handlers.applications import ApplicationHandler
-from handlers.music import MusicHandler
-from handlers.web_search import WebSearchHandler
-from handlers.alarm import AlarmHandler
-from handlers.weather import WeatherHandler
-from handlers.system_controls import SystemControls
-from handlers.system_info import SystemInfoHandler
-from handlers.qa_handler import QAHandler
+# Core Adapters & Router
+from core.adapters.base import ChatMessage
+from core.context_manager import ContextManager, context_mgr
+from core.llm_router import LLMRouter, router as default_router
 
-# Automation
+# Local Handlers
+from integrations.handlers.date_time import DateTimeHandler
+from integrations.handlers.applications import ApplicationHandler
+from integrations.handlers.music import MusicHandler
+from integrations.handlers.web_search import WebSearchHandler
+from integrations.handlers.alarm import AlarmHandler
+from integrations.handlers.weather import WeatherHandler
+from integrations.handlers.system_controls import SystemControls
+from integrations.handlers.system_info import SystemInfoHandler
 from automation.meeting_handler import MeetingHandler
-
-# Optional Gemini
-try:
-    from google import genai
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
+from integrations.handlers.qa_handler import QAHandler
+from integrations.skill_store import skill_store
 
 
 class JARVISEngine:
     """
     Central JARVIS Assistant Orchestrator.
-    Implements the InputGateway pattern for unified text and voice command routing.
+    Implements the Unified InputGateway pattern processing typed text and voice identically.
     """
 
-    AVAILABLE_COMMANDS = """
-Available commands:
-1. get_time - Tell current time
-2. get_date - Tell today's date
-3. open_app - Open an application (chrome, notepad, spotify, etc.)
-4. play_music - Play/control music. Play: "song name on spotify/youtube". Control: "pause", "next", "previous"
-5. web_search - Search Google for information (facts, people, news, etc.)
-6. set_alarm - Set an alarm/reminder (pass "cancel" in params to stop/cancel alarms)
-7. get_weather - Get weather for a city
-8. exit - Shutdown JARVIS completely
-9. sleep - Put JARVIS into sleep/standby mode
-10. conversation - General chat/greeting
-11. set_volume - Set system volume (0-100) or mute/unmute
-12. set_brightness - Set screen brightness (0-100)
-13. set_timer - Set a countdown timer
-14. stopwatch - Start/stop a stopwatch
-15. get_system_info - Get system diagnostics (battery, CPU, RAM)
-16. answer_question - Answer factual/conversational questions
-17. meeting_command - Meeting management: schedule/list/cancel/join/leave meetings, open meeting dashboard. Params: user command text.
+    def __init__(
+        self,
+        tts: Optional[TTSEngine] = None,
+        listener: Optional[VoiceListener] = None,
+        llm_router: Optional[LLMRouter] = None,
+        context_manager: Optional[ContextManager] = None,
+        **kwargs,
+    ):
+        self.tts = tts or kwargs.get("tts_engine") or default_tts
+        self.listener = listener or kwargs.get("voice_listener") or default_listener
+        self.router = llm_router or default_router
+        self.context = context_manager or context_mgr
 
-Respond in this exact format:
-COMMAND: <command_name>
-PARAMS: <parameters if any>
-RESPONSE: <what JARVIS should say>
-"""
-
-    def __init__(self, tts_engine: Optional[TTSEngine] = None):
-        self.tts_engine = tts_engine or TTSEngine(enabled=True)
-        self.weather_api_key = WEATHER_API_KEY
-        self.gemini_api_key = GEMINI_API_KEY
-        self.groq_api_key = GROQ_API_KEY
-
-        # State flags
-        self.is_sleeping = False
+        # Backward compatibility aliases & state flags
         self.running = True
+        self.is_thinking: bool = False
+        self.tts_engine = self.tts
+        self.voice_listener = self.listener
 
-        # Thread-local storage for capturing spoken response during execution
-        self._execution_lock = threading.Lock()
-        self._current_responses: List[str] = []
+        # Thread synchronization
+        self._lock = threading.Lock()
+        self._chat_listeners: List[Callable[[Dict[str, Any]], None]] = []
 
-        # Conversation memory
-        self.conversation_memory: List[Dict[str, str]] = []
-        self.max_memory = 6
+        # Handlers
+        self.datetime_handler = DateTimeHandler(self)
+        self.app_handler = ApplicationHandler(self)
+        self.music_handler = MusicHandler(self)
+        self.web_handler = WebSearchHandler(self)
+        self.alarm_handler = AlarmHandler(self)
+        self.weather_handler = WeatherHandler(self)
+        self.system_controls = SystemControls(self)
+        self.system_info = SystemInfoHandler(self)
+        self.meeting_handler = MeetingHandler(self)
+        self.qa_handler = QAHandler(self)
+
+        # Temporary response capture buffer during handler execution
+        self._captured_speech: List[str] = []
+
+        # Wire voice listener callback into unified InputGateway
+        if self.listener:
+            self.listener.on_command = self._on_voice_input
 
         # Iron Man flair acknowledgments
         self.ack_phrases = [
@@ -109,441 +104,519 @@ RESPONSE: <what JARVIS should say>
             "Right on it, sir.",
         ]
 
-        # Initialize AI Client if available
-        self.genai_client = None
-        self.ai_model = None
-        self._init_ai()
+    # ── Listener Registration for WebSockets ──────────────────────────
+    def register_chat_listener(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+        """Register a callback for CHAT_MESSAGE events."""
+        with self._lock:
+            if callback not in self._chat_listeners:
+                self._chat_listeners.append(callback)
 
-        # Initialize Handlers
-        self.datetime_handler = DateTimeHandler(self)
-        self.app_handler = ApplicationHandler(self)
-        self.music_handler = MusicHandler(self)
-        self.web_handler = WebSearchHandler(self)
-        self.alarm_handler = AlarmHandler(self)
-        self.weather_handler = WeatherHandler(self, self.weather_api_key)
-        self.system_controls = SystemControls(self)
-        self.system_info_handler = SystemInfoHandler(self)
-        self.qa_handler = QAHandler(self)
-        self.meeting_handler = MeetingHandler(self)
+    def _broadcast_chat_message(self, message: Dict[str, Any]) -> None:
+        """Broadcast chat events to all registered frontend listeners."""
+        with self._lock:
+            listeners = list(self._chat_listeners)
+        for cb in listeners:
+            try:
+                cb(message)
+            except Exception as e:
+                print(f"[Engine] Chat broadcast error: {e}")
 
-    # ── AI Client Init ────────────────────────────────────────────────
-    def _init_ai(self):
-        if not GEMINI_AVAILABLE:
+    # ── Audio State Convenience Methods ───────────────────────────────
+    def set_mic_active(self, active: bool) -> None:
+        if self.listener:
+            self.listener.set_mic_active(active)
+
+    def get_mic_active(self) -> bool:
+        return self.listener.get_mic_active() if self.listener else False
+
+    def toggle_mic(self) -> bool:
+        return self.listener.toggle_mic() if self.listener else False
+
+    def set_tts_active(self, active: bool) -> None:
+        if self.tts:
+            self.tts.set_tts_active(active)
+
+    def get_tts_active(self) -> bool:
+        return self.tts.get_tts_active() if self.tts else False
+
+    def toggle_tts(self) -> bool:
+        return self.tts.toggle_tts() if self.tts else False
+
+    # ── Speech Output Capture ─────────────────────────────────────────
+    def speak(self, text: str, wait: bool = False) -> None:
+        """
+        Synthesizes text through TTSEngine and logs to response buffer.
+        Respects tts_active toggle (silent mode if False).
+        """
+        if not text or not text.strip():
             return
-        if not self.gemini_api_key:
-            return
+        cleaned = text.strip()
+        self._captured_speech.append(cleaned)
+        if self.tts:
+            self.tts.speak(cleaned, wait=wait)
+
+    def _on_voice_input(self, spoken_text: str) -> None:
+        """Internal callback invoked when voice_listener transcribes a command."""
+        self.process_command(query=spoken_text, source="voice")
+
+    # ── Unified Input Gateway ─────────────────────────────────────────
+    def _broadcast_audio_state(self) -> None:
+        """Emit an immediate AUDIO_STATE broadcast so the HUD reacts instantly."""
         try:
-            self.genai_client = genai.Client(api_key=self.gemini_api_key)
-            self.ai_model = GEMINI_MODEL or "gemini-2.5-flash"
-        except Exception as e:
-            print(f"[Engine] Gemini init error: {e}")
+            status = (
+                "thinking" if self.is_thinking
+                else ("speaking" if self.tts.is_speaking()
+                      else ("listening" if self.get_mic_active() else "idle"))
+            )
+            payload = {
+                "mic_active": self.get_mic_active(),
+                "tts_active": self.get_tts_active(),
+                "status": status,
+                "meeting_auto_muted": getattr(self.listener, "meeting_auto_muted", False),
+            }
+            for cb in list(self._chat_listeners):
+                try:
+                    # Re-use chat listeners is not right — use the server broadcast directly
+                    pass
+                except Exception:
+                    pass
+            # Import lazily to avoid circular deps; server.broadcast_ws_sync handles it
+            try:
+                from automation.server import broadcast_ws_sync
+                broadcast_ws_sync("AUDIO_STATE", payload)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
-    # ── Speech Output & Response Interception ────────────────────────
-    def speak(self, text: str, wait: bool = False):
+    def process_command(self, query: str, source: str = "text") -> Dict[str, Any]:
         """
-        Output speech through TTSEngine and record it into the active execution transaction.
-        """
-        if not text:
-            return
-
-        print(f"JARVIS: {text}")
-        # Capture into current execution accumulator
-        self._current_responses.append(text)
-
-        # Forward to TTSEngine
-        if self.tts_engine:
-            self.tts_engine.speak(text, wait=wait)
-
-        # Add to conversational memory
-        if not any(skip in text.lower() for skip in ['listening', 'processing', "couldn't understand"]):
-            self.add_to_memory('assistant', text)
-
-    def add_to_memory(self, role: str, content: str):
-        self.conversation_memory.append({'role': role, 'content': content})
-        if len(self.conversation_memory) > self.max_memory * 2:
-            self.conversation_memory = self.conversation_memory[-self.max_memory * 2:]
-
-    def get_memory_context(self) -> str:
-        if not self.conversation_memory:
-            return ""
-        lines = ["\nRecent conversation:"]
-        for msg in self.conversation_memory[-4:]:
-            role = "User" if msg['role'] == 'user' else "JARVIS"
-            lines.append(f"{role}: {msg['content']}")
-        return "\n".join(lines)
-
-    def is_online(self) -> bool:
-        """Fast connectivity check."""
-        if JARVIS_FORCE_ONLINE:
-            return True
-        try:
-            socket.create_connection(("8.8.8.8", 53), timeout=1.5)
-            return True
-        except (socket.timeout, OSError):
-            return False
-
-    # ── Unified InputGateway ──────────────────────────────────────────
-    def execute_command(self, query: str, source: str = "text") -> Dict[str, Any]:
-        """
-        Single ingestion entry point for both text and voice commands.
-        Processes in strict priority order:
-          1. Local regex / keywords
-          2. Scheduled meeting intents
-          3. Gemini / Groq intent classification
-          4. Groq general Q&A
-        Returns structured dict:
-          {"status": "ok"|"error", "query": query, "response": str, "source": source, "action": str}
+        Unified InputGateway method processing both typed text and spoken voice commands identically.
+        Triage:
+        1. Fast deterministic local handlers (time, date, volume, brightness, battery, alarms, apps, skills, etc.)
+        2. LLM Intent Router (general_qa, workspace_rag, tier1_code, tier2_mcp, tier3_vision_gui, web_research)
         """
         if not query or not query.strip():
-            return {
-                "status": "ok",
-                "query": query,
-                "response": "How can I assist you, sir?",
-                "source": source,
-                "action": "empty",
-            }
+            return self._build_response("", source=source, action="none")
 
-        cleaned = query.strip()
-        command = cleaned.lower()
-        self.add_to_memory('user', cleaned)
+        clean_query = query.strip()
+        timestamp = datetime.now().isoformat()
+        msg_id = f"msg-{int(time.time() * 1000)}"
 
-        with self._execution_lock:
-            self._current_responses = []
-            action = "unknown"
-            status = "ok"
+        # Broadcast incoming user message
+        user_event = {
+            "id": f"user-{int(time.time() * 1000)}",
+            "sender": "user",
+            "source": source,
+            "text": clean_query,
+            "timestamp": timestamp,
+            "action": "input",
+            "data": {},
+        }
+        self._broadcast_chat_message(user_event)
 
-            try:
-                # ── STEP 1: Local Regex / Keywords ────────────────────
-                matched_local, action_name = self._match_local_command(command, cleaned)
-                if matched_local:
-                    action = action_name
-                else:
-                    # ── STEP 2: Scheduled Meeting Intents ──────────────
-                    matched_meeting, action_name = self._match_meeting_command(command, cleaned)
-                    if matched_meeting:
-                        action = action_name
-                    else:
-                        # ── STEP 3: Gemini / Groq Intent Classification ─
-                        matched_ai, action_name = self._match_ai_classification(command, cleaned)
-                        if matched_ai:
-                            action = action_name
-                        else:
-                            # ── STEP 4: Groq General Q&A ───────────────
-                            matched_qa, action_name = self._match_qa(command, cleaned)
-                            if matched_qa:
-                                action = action_name
-                            else:
-                                self.speak("I'm not sure how to help with that, sir. Try asking for the time, date, weather, or to open an application.")
-                                action = "unknown"
+        # Set thinking state
+        self.is_thinking = True
+        self._broadcast_audio_state()
 
-            except Exception as e:
-                status = "error"
-                action = "error"
-                print(f"[InputGateway Error] {e}")
-                self.speak(f"My apologies, sir. An error occurred while processing that request: {e}")
-
-            # Assemble response string from accumulated spoken sentences
-            if self._current_responses:
-                response_text = " ".join(self._current_responses)
-            else:
-                response_text = "Command executed, sir."
-
-            return {
-                "status": status,
-                "query": cleaned,
-                "response": response_text,
-                "source": source,
-                "action": action,
-            }
-
-    # ── Step 1: Local Command Matcher ─────────────────────────────────
-    def _match_local_command(self, command: str, original: str) -> tuple[bool, str]:
-        # Exit
-        if any(command == w for w in ['exit', 'quit', 'shutdown', 'goodbye']):
-            self.speak("Goodbye, sir. JARVIS shutting down.")
-            self.running = False
-            return True, "exit"
-
-        # Sleep
-        if any(w in command for w in ['sleep', 'stand by', 'stand down', 'go to sleep']):
-            self.is_sleeping = True
-            self.speak("Standing down, sir. Let me know when you need me.")
-            return True, "sleep"
-
-        # Wakeup / Greeting
-        if any(command == w for w in ['wake up', 'jarvis', 'hello', 'hi', 'hey', 'how are you']):
-            self.is_sleeping = False
-            self._cmd_greet()
-            return True, "greet"
-
-        # Time
-        if any(p in command for p in ['what time is it', "what's the time", 'current time', 'tell me the time', 'time please']) or command == 'time':
-            self._cmd_time()
-            return True, "get_time"
-
-        # Date
-        if any(p in command for p in ["what's the date", 'what is the date', "today's date", 'what day is it', 'tell me the date']) or command == 'date':
-            self._cmd_date()
-            return True, "get_date"
-
-        # Open Application
-        if command.startswith('open '):
-            self._cmd_open_app(command)
-            return True, "open_app"
-
-        # Music Controls
-        if any(word in command for word in ['pause', 'resume', 'continue', 'stop']) and any(m in command for m in ['music', 'song', 'playback']):
-            self._cmd_music_control(command)
-            return True, "music_control"
-        if any(word in command for word in ['next song', 'skip song', 'previous song', 'back song']):
-            self._cmd_music_control(command)
-            return True, "music_control"
-
-        # Play Music
-        if command.startswith('play '):
-            self._cmd_play_music(command)
-            return True, "play_music"
-
-        # Weather
-        if command.startswith(('weather', "what's the weather", 'how is the weather', 'whats the weather', 'what is the weather')):
-            self._cmd_weather(command)
-            return True, "get_weather"
-
-        # Web Search
-        if command.startswith(('search ', 'look up ', 'find ')):
-            self._cmd_search(command)
-            return True, "web_search"
-
-        # Alarm
-        if command.startswith(('alarm', 'remind', 'set alarm', 'set a reminder')):
-            self._cmd_alarm(command)
-            return True, "set_alarm"
-
-        # Volume
-        if any(word in command for word in ['volume', 'mute', 'unmute']):
-            self._cmd_volume(command)
-            return True, "set_volume"
-
-        # Brightness
-        if any(word in command for word in ['brightness', 'dim screen', 'brighten screen']):
-            self._cmd_brightness(command)
-            return True, "set_brightness"
-
-        # Timer
-        if 'timer' in command:
-            self._cmd_timer(command)
-            return True, "set_timer"
-
-        # Stopwatch
-        if any(word in command for word in ['stopwatch', 'stop watch']):
-            self._cmd_stopwatch(command)
-            return True, "stopwatch"
-
-        # System info / diagnostics
-        if any(w in command for w in ['system status', 'system info', 'diagnostics', 'battery', 'cpu usage']):
-            self._cmd_system_info(command)
-            return True, "get_system_info"
-
-        return False, ""
-
-    # ── Step 2: Meeting Commands Matcher ──────────────────────────────
-    def _match_meeting_command(self, command: str, original: str) -> tuple[bool, str]:
-        meeting_keywords = [
-            'schedule meeting', 'schedule a meeting', 'schedule team',
-            'meetings today', 'what meetings do i have', 'list my meetings', 'list meetings',
-            'cancel meeting', 'cancel my next meeting',
-            'join meeting', 'join the meeting', 'leave meeting', 'leave the meeting',
-            'open schedule', 'open dashboard', 'meeting dashboard',
-            'meet.google.com', 'teams.microsoft.com'
-        ]
-        if any(kw in command for kw in meeting_keywords) or (('meeting' in command or 'meetings' in command) and any(w in command for w in ['schedule', 'join', 'leave', 'cancel', 'list', 'show'])):
-            self._cmd_meeting(original)
-            return True, "meeting_command"
-        return False, ""
-
-    # ── Step 3: AI NLP Intent Classification ──────────────────────────
-    def _match_ai_classification(self, command: str, original: str) -> tuple[bool, str]:
-        # Try Groq classification first, then Gemini
-        success, cmd_name = self._process_with_ai(original)
-        if success:
-            return True, cmd_name or "ai_classified"
-        return False, ""
-
-    # ── Step 4: Groq / Gemini Q&A Matcher ─────────────────────────────
-    def _match_qa(self, command: str, original: str) -> tuple[bool, str]:
-        if self.qa_handler.is_question(command):
-            self.qa_handler.answer_question(original)
-            return True, "answer_question"
-        return False, ""
-
-    # ── Local Action Execution Helpers ────────────────────────────────
-    def _cmd_time(self):
-        self.datetime_handler.tell_time()
-
-    def _cmd_date(self):
-        self.datetime_handler.tell_date()
-
-    def _cmd_greet(self):
-        hour = datetime.now().hour
-        if 5 <= hour < 12:
-            greet = "Good morning, sir. All systems are online."
-        elif 12 <= hour < 17:
-            greet = "Good afternoon, sir. How can I assist?"
-        elif 17 <= hour < 22:
-            greet = "Good evening, sir. Ready when you are."
-        else:
-            greet = "Working late, sir? Systems operational."
-        self.speak(greet)
-
-    def _cmd_open_app(self, command: str):
-        self.app_handler.open_application(command)
-
-    def _cmd_play_music(self, command: str):
-        self.music_handler.play_music(command)
-
-    def _cmd_music_control(self, command: str):
-        self.music_handler.process_control_command(command)
-
-    def _cmd_weather(self, command: str):
-        self.weather_handler.process_weather_command(command)
-
-    def _cmd_search(self, command: str):
-        self.web_handler.web_search(command)
-
-    def _cmd_alarm(self, command: str):
-        self.alarm_handler.set_alarm(command)
-
-    def _cmd_volume(self, command: str):
-        self.system_controls.set_volume(command)
-
-    def _cmd_brightness(self, command: str):
-        self.system_controls.set_brightness(command)
-
-    def _cmd_timer(self, command: str):
-        self.system_controls.set_timer(command)
-
-    def _cmd_stopwatch(self, command: str):
-        if 'stop' in command:
-            self.system_controls.stop_stopwatch()
-        else:
-            self.system_controls.start_stopwatch()
-
-    def _cmd_system_info(self, command: str):
-        stats = self.system_info_handler.get_quick_stats()
-        parts = [f"CPU is at {stats['cpu']} percent."]
-        if stats.get('battery') is not None:
-            plugged = "plugged in" if stats.get('plugged_in') else "on battery"
-            parts.append(f"Battery is at {stats['battery']} percent and {plugged}.")
-        self.speak(" ".join(parts))
-
-    def _cmd_meeting(self, command: str):
-        self.meeting_handler.process_meeting_command(command)
-
-    # ── AI Processing ─────────────────────────────────────────────────
-    def _process_with_ai(self, command: str) -> tuple[bool, str]:
-        """Attempt Groq classification; fallback to Gemini."""
-        if hasattr(self, 'qa_handler') and self.qa_handler.groq_client:
-            success, cmd = self._process_with_groq(command)
-            if success:
-                return True, cmd
-
-        if self.ai_model and self.genai_client:
-            return self._process_with_gemini(command)
-        return False, ""
-
-    def _process_with_groq(self, command: str) -> tuple[bool, str]:
-        prompt = f"{self.AVAILABLE_COMMANDS}{self.get_memory_context()}\nUser: {command}\n"
-        candidate_models = [GROQ_MODEL, "qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "allam-2-7b"]
-        for m in candidate_models:
-            try:
-                response = self.qa_handler.groq_client.chat.completions.create(
-                    model=m,
-                    messages=[
-                        {"role": "system", "content": "You are a command classifier for JARVIS. Follow the exact output format specified."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    temperature=0.2,
-                    max_tokens=200,
-                )
-                return self._handle_ai_response(response.choices[0].message.content, command)
-            except Exception as e:
-                err_str = str(e).lower()
-                if "model_not_found" in err_str or "does not exist" in err_str:
-                    continue
-                return False, ""
-        return False, ""
-
-    def _process_with_gemini(self, command: str) -> tuple[bool, str]:
-        prompt = f"{self.AVAILABLE_COMMANDS}{self.get_memory_context()}\nUser: {command}\n"
-        gemini_candidates = [self.ai_model, "gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]
-        for g_model in [m for m in gemini_candidates if m]:
-            try:
-                response = self.genai_client.models.generate_content(
-                    model=g_model,
-                    contents=prompt,
-                    config={'temperature': 0.3, 'max_output_tokens': 200}
-                )
-                return self._handle_ai_response(response.text, command)
-            except Exception as e:
-                err_str = str(e).lower()
-                if "not found" in err_str or "404" in err_str:
-                    continue
-                return False, ""
-        return False, ""
-
-    def _handle_ai_response(self, text: str, command: str) -> tuple[bool, str]:
-        cmd, params, resp = None, "", ""
-        for line in text.strip().split('\n'):
-            line = line.strip()
-            if line.startswith('COMMAND:'):
-                cmd = line.replace('COMMAND:', '').strip()
-            elif line.startswith('PARAMS:'):
-                params = line.replace('PARAMS:', '').strip()
-            elif line.startswith('RESPONSE:'):
-                resp = line.replace('RESPONSE:', '').strip()
-
-        if not cmd:
-            return False, ""
-
-        if resp and cmd != 'answer_question':
-            if cmd in ['open_app', 'play_music', 'set_alarm', 'set_timer'] and random.random() < 0.4:
-                resp = random.choice(self.ack_phrases) + " " + resp
-            self.speak(resp)
-
-        if cmd and cmd != 'conversation':
-            self._execute_ai_command(cmd, params, command)
-
-        return True, cmd
-
-    def _execute_ai_command(self, cmd: str, params: str, original_command: str):
         try:
-            if cmd == 'get_time':
-                self.datetime_handler.tell_time()
-            elif cmd == 'get_date':
-                self.datetime_handler.tell_date()
-            elif cmd == 'open_app':
-                self.app_handler.open_application(f"open {params}")
-            elif cmd == 'play_music':
-                self.music_handler.play_music(f"play {params}")
-            elif cmd == 'web_search':
-                self.web_handler.web_search(f"search {params}")
-            elif cmd == 'set_alarm':
-                self.alarm_handler.set_alarm(f"set alarm for {params}")
-            elif cmd == 'get_weather':
-                self.weather_handler.process_weather_command(original_command)
-            elif cmd == 'set_volume':
-                self.system_controls.set_volume(params)
-            elif cmd == 'set_brightness':
-                self.system_controls.set_brightness(params)
-            elif cmd == 'set_timer':
-                self.system_controls.set_timer(params)
-            elif cmd == 'stopwatch':
-                self.system_controls.start_stopwatch()
-            elif cmd == 'get_system_info':
-                self._cmd_system_info(original_command)
-            elif cmd == 'meeting_command':
-                self.meeting_handler.process_meeting_command(original_command)
-            elif cmd == 'answer_question':
-                self.qa_handler.answer_question(original_command)
+            return self._process_command_inner(clean_query, source)
+        finally:
+            self.is_thinking = False
+            self._broadcast_audio_state()
+
+    def _process_command_inner(self, clean_query: str, source: str) -> Dict[str, Any]:
+        """Inner command processing logic, wrapped by process_command for is_thinking management."""
+        # Clear captured speech buffer
+        self._captured_speech.clear()
+
+        # Teach Mode recording
+        if skill_store.is_teaching() and source != "macro":
+            stop_phrases = ["stop teaching", "stop recording", "end teach", "save routine", "cancel teach"]
+            if not any(sp in clean_query.lower() for sp in stop_phrases):
+                skill_store.record_step(clean_query)
+
+        # Step 1: Check saved skill macros in skills.json
+        skill_response = self._check_skills_macro(clean_query)
+        if skill_response:
+            return self._finalize_response(skill_response, source, action="skill_macro")
+
+        # Step 2: Try fast deterministic handlers
+        handled, response_text, action_type, extra_data = self._try_deterministic_handlers(clean_query)
+        if handled:
+            # If handler invoked self.speak, captured speech has priority
+            if self._captured_speech:
+                response_text = " ".join(self._captured_speech)
+            return self._finalize_response(response_text, source, action=action_type, data=extra_data)
+
+        # Step 3: LLM Intent Classification & Dynamic Routing
+        llm_response = self._triage_llm(clean_query)
+        return self._finalize_response(
+            llm_response.get("text", ""),
+            source,
+            action=llm_response.get("action", "general_qa"),
+            data=llm_response.get("data", {}),
+        )
+
+    def _finalize_response(
+        self,
+        text: str,
+        source: str,
+        action: str = "none",
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Formats and broadcasts final assistant response."""
+        resp = self._build_response(text, source=source, action=action, data=data or {})
+        # Speak text if not already spoken during handler
+        if not self._captured_speech and text:
+            self.speak(text)
+        self._broadcast_chat_message(resp)
+        return resp
+
+    def _build_response(
+        self,
+        text: str,
+        source: str = "text",
+        action: str = "none",
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Construct standard response dictionary contract."""
+        return {
+            "id": f"jarvis-{int(time.time() * 1000)}",
+            "sender": "jarvis",
+            "source": source,
+            "text": text,
+            "response": text,  # Backward compatibility alias
+            "status": "ok",    # Backward compatibility alias
+            "timestamp": datetime.now().isoformat(),
+            "action": action,
+            "data": data or {},
+        }
+
+    def is_online(self) -> bool:
+        """Check if internet connectivity is available."""
+        return is_internet_connected()
+
+    # Backward compatibility alias
+    execute_command = process_command
+
+    # ── Fast Deterministic Local Handlers ─────────────────────────────
+    def _try_deterministic_handlers(self, query: str) -> Tuple[bool, str, str, Dict[str, Any]]:
+        """
+        Evaluates regex rules for local zero-latency handlers.
+        Returns: (handled: bool, response: str, action: str, data: dict)
+        """
+        q = query.lower().strip()
+
+        # 0. Clear conversation memory
+        if q in ("clear memory", "reset conversation", "clear chat", "clear context"):
+            self.context.clear()
+            return True, "Conversation memory cleared, sir.", "clear_memory", {}
+
+        # 1. Time
+        if re.search(r"\b(what time|time is it|current time|tell me the time)\b", q):
+            now_str = datetime.now().strftime("%I:%M %p")
+            return True, f"The current time is {now_str}, sir.", "get_time", {"time": now_str}
+
+        # 2. Date
+        if re.search(r"\b(what('s| is)? (the )?date|what date|what day|today's date|current date|date today)\b", q):
+            date_str = datetime.now().strftime("%A, %B %d, %Y")
+            return True, f"Today is {date_str}, sir.", "get_date", {"date": date_str}
+
+        # 2.5 Greeting
+        if re.search(r"\b(hello|hey jarvis|hi jarvis|greetings|good morning|good afternoon|good evening)\b", q) or q in ("hi", "hello"):
+            return True, "Greetings, sir. How may I assist you today?", "greet", {}
+
+        # 3. System Diagnostics (Battery / CPU / RAM / Status)
+        if re.search(r"\b(battery|cpu|system status|system diagnostics|diagnostics|specs|ram usage|how is the system)\b", q):
+            try:
+                import psutil
+                cpu = psutil.cpu_percent(interval=None)
+                ram = psutil.virtual_memory().percent
+                battery = psutil.sensors_battery()
+                batt_info = f"Battery at {int(battery.percent)}%." if battery else "No battery detected."
+                status_text = f"Systems nominal, sir. CPU load is at {cpu}%, RAM utilization is {ram}%. {batt_info}"
+                return True, status_text, "system_info", {
+                    "cpu": cpu,
+                    "ram": ram,
+                    "battery": int(battery.percent) if battery else None,
+                }
+            except Exception as e:
+                return True, "All primary system monitors active.", "system_info", {"error": str(e)}
+
+        # 4. Volume Controls
+        if re.search(r"\b(mute volume|mute sound|mute audio)\b", q):
+            try:
+                self.system_controls.mute()
+                return True, "Audio muted, sir.", "set_volume", {"volume": 0, "muted": True}
+            except Exception:
+                return True, "Audio muted.", "set_volume", {}
+
+        if re.search(r"\b(unmute volume|unmute sound|unmute audio)\b", q):
+            try:
+                self.system_controls.unmute()
+                return True, "Audio restored, sir.", "set_volume", {"muted": False}
+            except Exception:
+                return True, "Audio restored.", "set_volume", {}
+
+        vol_match = re.search(r"\b(set volume to|volume to|set volume)\s+(\d+)\b", q)
+        if vol_match:
+            val = int(vol_match.group(2))
+            try:
+                self.system_controls.set_volume(str(val))
+                return True, f"Volume adjusted to {val} percent, sir.", "set_volume", {"volume": val}
+            except Exception:
+                return True, f"Volume set to {val}%.", "set_volume", {"volume": val}
+
+        # 5. Brightness Controls
+        bright_match = re.search(r"\b(set brightness to|brightness to|set brightness)\s+(\d+)\b", q)
+        if bright_match:
+            val = int(bright_match.group(2))
+            try:
+                self.system_controls.set_brightness(str(val))
+                return True, f"Display brightness set to {val} percent, sir.", "set_brightness", {"brightness": val}
+            except Exception:
+                return True, f"Brightness adjusted to {val}%.", "set_brightness", {"brightness": val}
+
+        # 6. Alarms & Countdown Timers
+        alarm_match = re.search(r"\bset alarm for\s+(.+)", q)
+        if alarm_match:
+            target = alarm_match.group(1).strip()
+            res = self.alarm_handler.set_alarm(f"set alarm for {target}")
+            return True, res or f"Alarm set for {target}, sir.", "set_alarm", {"time": target}
+
+        timer_match = re.search(r"\bset timer for\s+(.+)", q)
+        if timer_match:
+            target = timer_match.group(1).strip()
+            self.system_controls.set_timer(target)
+            return True, f"Countdown timer initiated for {target}, sir.", "set_timer", {"duration": target}
+
+        # 7. Weather
+        if re.search(r"\b(weather|temperature|forecast|is it raining|how hot is it)\b", q):
+            try:
+                res = self.weather_handler.process_weather_command(query)
+                return True, res or "Weather telemetry retrieved.", "get_weather", {}
+            except Exception:
+                pass
+
+        # 8. Open Applications
+        app_match = re.search(r"\b(open|launch|start)\s+([a-zA-Z0-9_\-\s]+)\b", q)
+        if app_match and not any(k in q for k in ["mode", "meeting", "timer", "alarm", "file"]):
+            app_name = app_match.group(2).strip()
+            try:
+                self.app_handler.open_application(f"open {app_name}")
+                return True, f"Launching {app_name}, sir.", "open_app", {"app": app_name}
+            except Exception:
+                return True, f"Attempting to launch {app_name}.", "open_app", {"app": app_name}
+
+        # 9. Music / Media
+        if q.startswith("play ") or "play music" in q or "pause music" in q or "stop music" in q:
+            try:
+                self.music_handler.play_music(query)
+                return True, f"Media playback updated, sir.", "play_music", {}
+            except Exception:
+                pass
+
+        # 10. Clipboard Copilot Voice/Text Triggers
+        if re.search(r"\b(summarize clipboard|summarize this|fix this code|explain this|explain selection|translate selection)\b", q):
+            try:
+                from integrations.handlers.clipboard_copilot import clipboard_copilot
+                res = clipboard_copilot.act_on_clipboard(q)
+                return True, res, "clipboard_copilot", {}
+            except Exception as e:
+                return True, f"Clipboard processing error: {e}", "clipboard_copilot", {}
+
+        # 11. Meeting Commands & URLs
+        meeting_phrases = [
+            "schedule meeting", "add meeting", "what meetings", "my meetings",
+            "list meetings", "upcoming meetings", "cancel meeting", "cancel next meeting",
+            "join meeting", "leave meeting", "end the call",
+        ]
+        meeting_domains = ["meet.google.com", "teams.microsoft.com", "teams.live.com"]
+        if any(p in q for p in meeting_phrases) or any(d in q for d in meeting_domains):
+            self.meeting_handler.process_meeting_command(query)
+            return True, "Meeting command processed, sir.", "meeting_command", {}
+
+        return False, "", "none", {}
+
+    # ── Check Skill Macros ────────────────────────────────────────────
+    def _check_skills_macro(self, query: str) -> Optional[str]:
+        """Checks if the query matches a saved routine in config/skills.json."""
+        q = query.lower().strip()
+        if not SKILLS_FILE.exists():
+            return None
+
+        try:
+            skills = json.loads(SKILLS_FILE.read_text(encoding="utf-8"))
+            for s in skills:
+                triggers = s.get("trigger_phrases", [])
+                if any(t.lower() == q or t.lower() in q for t in triggers):
+                    steps = s.get("steps", [])
+                    print(f"[SkillMacro] Triggered skill: '{s.get('name')}' ({len(steps)} steps)")
+                    results = []
+                    for step in steps:
+                        res = self.process_command(step, source="macro")
+                        if res.get("text"):
+                            results.append(res["text"])
+                    summary = f"Routine '{s.get('name')}' executed. " + " ".join(results)
+                    return summary
         except Exception as e:
-            print(f"[AI Exec Error] {e}")
+            print(f"[SkillMacro] Error reading skills: {e}")
+
+        return None
+
+    # ── LLM Dynamic Triage & Classification ───────────────────────────
+    def _triage_llm(self, query: str) -> Dict[str, Any]:
+        """
+        Uses intent_router role to classify ambiguous commands into one of 6 branches:
+        - general_qa
+        - workspace_rag
+        - tier1_code
+        - tier2_mcp
+        - tier3_vision_gui
+        - web_research
+        """
+        system_prompt = (
+            "You are the central intent classifier for JARVIS 2.0 desktop AI OS.\n"
+            "Analyze the user command and return a valid JSON object with:\n"
+            "{\n"
+            '  "intent": "general_qa" | "workspace_rag" | "tier1_code" | "tier2_mcp" | "tier3_vision_gui" | "web_research",\n'
+            '  "target": "<extracted query or target app>",\n'
+            '  "quick_reply": "<short direct answer if general_qa, or acknowledgement>"\n'
+            "}\n"
+            "Classification guidelines:\n"
+            "- general_qa: standard questions, facts, calculations, general conversation.\n"
+            "- workspace_rag: queries specifically asking about files or documents in the workspace.\n"
+            "- tier1_code: file manipulation, PDFs, data processing, shell diagnostics, conversions.\n"
+            "- tier2_mcp: queries requesting tools or external service integrations.\n"
+            "- tier3_vision_gui: commands to click, type, operate, or visually control desktop apps.\n"
+            "- web_research: requests to research a URL or browse the web autonomously.\n"
+        )
+
+        try:
+            parsed = self.router.query_json("intent_router", query, system_prompt=system_prompt)
+            if parsed and isinstance(parsed, dict) and "intent" in parsed:
+                intent = parsed.get("intent", "general_qa")
+                reply = parsed.get("quick_reply", "")
+
+                if intent == "general_qa":
+                    # Wire multi-turn conversation memory
+                    self.context.add_user_message(query)
+                    ctx_messages = self.context.get_messages()
+                    resp = self.router.dispatch_role("qa_chat", ctx_messages)
+                    full_answer = resp.text
+                    if full_answer:
+                        self.context.add_assistant_message(full_answer)
+                    return {
+                        "text": full_answer or reply or "Understood, sir.",
+                        "action": "general_qa",
+                        "data": parsed,
+                    }
+
+                elif intent == "tier1_code":
+                    try:
+                        from agent_os.code_executor import code_executor
+                        result = code_executor.execute_task(query)
+                        return {
+                            "text": result.get("summary", "Code execution complete, sir."),
+                            "action": "tier1_code",
+                            "data": result,
+                        }
+                    except Exception as e:
+                        return {"text": f"Code execution notice: {e}", "action": "tier1_code", "data": {}}
+
+                elif intent == "tier2_mcp":
+                    try:
+                        from integrations.mcp_client import mcp_client
+                        tools = mcp_client.list_tools()
+                        if not tools:
+                            return {
+                                "text": "No external MCP tools are currently configured or active, sir.",
+                                "action": "tier2_mcp",
+                                "data": {},
+                            }
+                        tool_prompt = (
+                            "You are the MCP tool selector for JARVIS 2.0. Analyze the user request and select the "
+                            "appropriate server_name, tool_name, and arguments from the available tools list.\n"
+                            f"Available tools: {json.dumps(tools)}\n"
+                            "Return valid JSON:\n"
+                            "{\n"
+                            '  "server_name": "<server name>",\n'
+                            '  "tool_name": "<tool name>",\n'
+                            '  "arguments": {<extracted tool arguments>}\n'
+                            "}"
+                        )
+                        decision = self.router.query_json("intent_router", query, system_prompt=tool_prompt)
+                        s_name = decision.get("server_name")
+                        t_name = decision.get("tool_name")
+                        t_args = decision.get("arguments", {})
+                        res = mcp_client.call_tool(s_name, t_name, t_args)
+                        res_summary = res.get("output") or res.get("result") or ("Success" if res.get("ok") else res.get("error"))
+                        return {
+                            "text": f"MCP tool '{t_name}' executed on server '{s_name}'. Result: {res_summary}",
+                            "action": "tier2_mcp",
+                            "data": res,
+                        }
+                    except Exception as e:
+                        return {"text": f"MCP execution notice: {e}", "action": "tier2_mcp", "data": {}}
+
+                elif intent == "tier3_vision_gui":
+                    try:
+                        from agent_os.state_machine import os_agent
+                        result = os_agent.run_task(query)
+                        return {
+                            "text": result.get("summary", "GUI operation finished, sir."),
+                            "action": "tier3_vision_gui",
+                            "data": result,
+                        }
+                    except Exception as e:
+                        return {"text": f"Vision agent notice: {e}", "action": "tier3_vision_gui", "data": {}}
+
+                elif intent == "web_research":
+                    try:
+                        from automation.web_agent import web_agent
+                        result = web_agent.research(query)
+                        return {
+                            "text": result.get("summary", "Web research completed, sir."),
+                            "action": "web_research",
+                            "data": result,
+                        }
+                    except Exception as e:
+                        return {"text": f"Web researcher notice: {e}", "action": "web_research", "data": {}}
+
+                elif intent == "workspace_rag":
+                    try:
+                        from integrations.workspace_rag import workspace_rag
+                        result = workspace_rag.query(query)
+                        return {
+                            "text": result.get("answer", "Workspace search completed, sir."),
+                            "action": "workspace_rag",
+                            "data": result,
+                        }
+                    except Exception as e:
+                        return {"text": f"Workspace RAG notice: {e}", "action": "workspace_rag", "data": {}}
+
+                return {
+                    "text": reply or "Right away, sir.",
+                    "action": intent,
+                    "data": parsed,
+                }
+        except Exception as e:
+            print(f"[Engine] Intent triage fallback: {e}")
+
+        # Fallback to direct conversational response with multi-turn memory
+        self.context.add_user_message(query)
+        ctx_messages = self.context.get_messages()
+        resp = self.router.dispatch_role("qa_chat", ctx_messages)
+        answer = resp.text
+        if answer:
+            self.context.add_assistant_message(answer)
+        return {
+            "text": answer or "I am listening, sir. How may I assist you?",
+            "action": "general_qa",
+            "data": {},
+        }
+
+
+# Singleton engine instance
+engine = JARVISEngine()

@@ -1,0 +1,81 @@
+{
+  "autonomous_trust_mode": false,
+  "workspace_path": "",
+  "roles": {
+    "intent_router": {
+      "provider": "free llms",
+      "model": "auto"
+    },
+    "qa_chat": {
+      "provider": "free llms",
+      "model": "auto"
+    },
+    "vision_agent": {
+      "provider": "free llms",
+      "model": "auto"
+    },
+    "offline_fallback": {
+      "provider": "free llms",
+      "model": "auto"
+    }
+  },
+  "providers": {
+    "gemini": {
+      "keys": [],
+      "active_index": 0,
+      "models": [
+        "gemini-2.5-flash",
+        "gemini-2.5-pro"
+      ]
+    },
+    "groq": {
+      "keys": [],
+      "active_index": 0,
+      "models": [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant"
+      ]
+    },
+    "anthropic": {
+      "keys": [],
+      "active_index": 0,
+      "models": [
+        "claude-3-5-sonnet-latest"
+      ]
+    },
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api/v1",
+      "keys": [],
+      "active_index": 0,
+      "models": [
+        "openai/gpt-4o-mini",
+        "deepseek/deepseek-chat"
+      ]
+    },
+    "ollama": {
+      "base_url": "http://127.0.0.1:11434/v1",
+      "keys": [],
+      "active_index": 0,
+      "models": [
+        "qwen2.5:7b",
+        "llama3.2:latest"
+      ]
+    },
+    "custom_endpoints": [
+      {
+        "id": "custom-1792521259862",
+        "name": "free llms",
+        "base_url": "http://127.0.0.1:31415/v1",
+        "api_key": "freellmapi-dc45c78fe6033a2efb4e3ae1cb7ecbadf4eb082297adaf79",
+        "model": "auto"
+      }
+    ],
+    "openweathermap": {
+      "keys": [],
+      "keys_masked": []
+    }
+  },
+  "services": {
+    "openweathermap": ""
+  }
+}
