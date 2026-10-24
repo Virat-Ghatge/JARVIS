@@ -45,6 +45,15 @@ from automation.meeting_handler import MeetingHandler
 from integrations.handlers.qa_handler import QAHandler
 from integrations.skill_store import skill_store
 
+VALID_INTENTS = {
+    "general_qa",
+    "workspace_rag",
+    "tier1_code",
+    "tier2_mcp",
+    "tier3_vision_gui",
+    "web_research",
+}
+
 
 class JARVISEngine:
     """
@@ -266,7 +275,27 @@ class JARVISEngine:
         data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Formats and broadcasts final assistant response."""
-        resp = self._build_response(text, source=source, action=action, data=data or {})
+        # Sanitize action if malformed or arbitrary string
+        clean_action = action
+        valid_deterministic = (
+            action.startswith("get_")
+            or action.startswith("set_")
+            or action in (
+                "skill_macro",
+                "greet",
+                "clear_memory",
+                "system_info",
+                "open_app",
+                "play_music",
+                "clipboard_copilot",
+                "meeting_command",
+                "none",
+            )
+        )
+        if clean_action not in VALID_INTENTS and not valid_deterministic:
+            clean_action = "general_qa"
+
+        resp = self._build_response(text, source=source, action=clean_action, data=data or {})
         # Speak text if not already spoken during handler
         if not self._captured_speech and text:
             self.speak(text)
@@ -318,7 +347,13 @@ class JARVISEngine:
             now_str = datetime.now().strftime("%I:%M %p")
             return True, f"The current time is {now_str}, sir.", "get_time", {"time": now_str}
 
-        # 2. Date
+        # 2. Date, Year & Month
+        if re.search(r"\b(what year|current year|which year is it|year is it now)\b", q):
+            return True, f"The current year is {datetime.now().year}, sir.", "get_date", {"year": datetime.now().year}
+
+        if re.search(r"\b(what month|current month|which month is it)\b", q):
+            return True, f"It is currently {datetime.now().strftime('%B %Y')}, sir.", "get_date", {}
+
         if re.search(r"\b(what('s| is)? (the )?date|what date|what day|today's date|current date|date today)\b", q):
             date_str = datetime.now().strftime("%A, %B %d, %Y")
             return True, f"Today is {date_str}, sir.", "get_date", {"date": date_str}
@@ -468,151 +503,161 @@ class JARVISEngine:
     # ── LLM Dynamic Triage & Classification ───────────────────────────
     def _triage_llm(self, query: str) -> Dict[str, Any]:
         """
-        Uses intent_router role to classify ambiguous commands into one of 6 branches:
-        - general_qa
-        - workspace_rag
-        - tier1_code
-        - tier2_mcp
-        - tier3_vision_gui
-        - web_research
+        Fast intent triage and direct single-call LLM response gateway.
+        - Fast keyword/pattern routing for live web, code, vision, and RAG.
+        - Direct single-call generation for general QA with automatic web search fallback on cutoff/refusal.
+        - NEVER allows invalid strings to leak into action.
         """
-        system_prompt = (
-            "You are the central intent classifier for JARVIS 2.0 desktop AI OS.\n"
-            "Analyze the user command and return a valid JSON object with:\n"
-            "{\n"
-            '  "intent": "general_qa" | "workspace_rag" | "tier1_code" | "tier2_mcp" | "tier3_vision_gui" | "web_research",\n'
-            '  "target": "<extracted query or target app>",\n'
-            '  "quick_reply": "<short direct answer if general_qa, or acknowledgement>"\n'
-            "}\n"
-            "Classification guidelines:\n"
-            "- general_qa: standard questions, facts, calculations, general conversation.\n"
-            "- workspace_rag: queries specifically asking about files or documents in the workspace.\n"
-            "- tier1_code: file manipulation, PDFs, data processing, shell diagnostics, conversions.\n"
-            "- tier2_mcp: queries requesting tools or external service integrations.\n"
-            "- tier3_vision_gui: commands to click, type, operate, or visually control desktop apps.\n"
-            "- web_research: requests to research a URL or browse the web autonomously.\n"
-        )
+        q_lower = query.lower().strip()
 
-        try:
-            parsed = self.router.query_json("intent_router", query, system_prompt=system_prompt)
-            if parsed and isinstance(parsed, dict) and "intent" in parsed:
-                intent = parsed.get("intent", "general_qa")
-                reply = parsed.get("quick_reply", "")
+        # 1. Live Web / Current Events Detection
+        web_pattern = r"\b(2025|2026|this year|latest|most heard|most streamed|top song|who won|current price|news about|search web|look up online|on spotify)\b"
+        if re.search(web_pattern, q_lower):
+            try:
+                from automation.web_agent import web_agent
+                result = web_agent.research(query)
+                summary = result.get("summary") or "Web research completed, sir."
+                self.context.add_user_message(query)
+                self.context.add_assistant_message(summary)
+                return {
+                    "text": summary,
+                    "action": "web_research",
+                    "data": result,
+                }
+            except Exception as e:
+                print(f"[Engine] Fast web research error: {e}")
 
-                if intent == "general_qa":
-                    # Wire multi-turn conversation memory
-                    self.context.add_user_message(query)
-                    ctx_messages = self.context.get_messages()
-                    resp = self.router.dispatch_role("qa_chat", ctx_messages)
-                    full_answer = resp.text
-                    if full_answer:
-                        self.context.add_assistant_message(full_answer)
-                    return {
-                        "text": full_answer or reply or "Understood, sir.",
-                        "action": "general_qa",
-                        "data": parsed,
-                    }
+        # 2. Explicit OS / Code / GUI / RAG Triggers
+        code_pattern = r"\b(write a python script|run a script|create a file|zip folder|in my downloads|in my desktop)\b"
+        if re.search(code_pattern, q_lower):
+            try:
+                from agent_os.code_executor import code_executor
+                result = code_executor.execute_task(query)
+                return {
+                    "text": result.get("summary", "Code execution complete, sir."),
+                    "action": "tier1_code",
+                    "data": result,
+                }
+            except Exception as e:
+                return {"text": f"Code execution notice: {e}", "action": "tier1_code", "data": {}}
 
-                elif intent == "tier1_code":
-                    try:
-                        from agent_os.code_executor import code_executor
-                        result = code_executor.execute_task(query)
-                        return {
-                            "text": result.get("summary", "Code execution complete, sir."),
-                            "action": "tier1_code",
-                            "data": result,
-                        }
-                    except Exception as e:
-                        return {"text": f"Code execution notice: {e}", "action": "tier1_code", "data": {}}
+        gui_pattern = r"\b(click on|type into|on my screen|visually operate)\b"
+        if re.search(gui_pattern, q_lower):
+            try:
+                from agent_os.state_machine import os_agent
+                result = os_agent.run_task(query)
+                return {
+                    "text": result.get("summary", "GUI operation finished, sir."),
+                    "action": "tier3_vision_gui",
+                    "data": result,
+                }
+            except Exception as e:
+                return {"text": f"Vision agent notice: {e}", "action": "tier3_vision_gui", "data": {}}
 
-                elif intent == "tier2_mcp":
-                    try:
-                        from integrations.mcp_client import mcp_client
-                        tools = mcp_client.list_tools()
-                        if not tools:
-                            return {
-                                "text": "No external MCP tools are currently configured or active, sir.",
-                                "action": "tier2_mcp",
-                                "data": {},
-                            }
-                        tool_prompt = (
-                            "You are the MCP tool selector for JARVIS 2.0. Analyze the user request and select the "
-                            "appropriate server_name, tool_name, and arguments from the available tools list.\n"
-                            f"Available tools: {json.dumps(tools)}\n"
-                            "Return valid JSON:\n"
-                            "{\n"
-                            '  "server_name": "<server name>",\n'
-                            '  "tool_name": "<tool name>",\n'
-                            '  "arguments": {<extracted tool arguments>}\n'
-                            "}"
-                        )
-                        decision = self.router.query_json("intent_router", query, system_prompt=tool_prompt)
+        rag_pattern = r"\b(in my workspace|in my project files|search my documents)\b"
+        if re.search(rag_pattern, q_lower):
+            try:
+                from integrations.workspace_rag import workspace_rag
+                result = workspace_rag.query(query)
+                return {
+                    "text": result.get("answer", "Workspace search completed, sir."),
+                    "action": "workspace_rag",
+                    "data": result,
+                }
+            except Exception as e:
+                return {"text": f"Workspace RAG notice: {e}", "action": "workspace_rag", "data": {}}
+
+        # Check MCP trigger
+        mcp_pattern = r"\b(mcp tool|use tool|call tool|list tools)\b"
+        if re.search(mcp_pattern, q_lower):
+            try:
+                from integrations.mcp_client import mcp_client
+                tools = mcp_client.list_tools()
+                if tools:
+                    tool_prompt = (
+                        "You are the MCP tool selector for JARVIS 2.0. Analyze the user request and select the "
+                        "appropriate server_name, tool_name, and arguments from the available tools list.\n"
+                        f"Available tools: {json.dumps(tools)}\n"
+                        "Return valid JSON:\n"
+                        "{\n"
+                        '  "server_name": "<server name>",\n'
+                        '  "tool_name": "<tool name>",\n'
+                        '  "arguments": {<extracted tool arguments>}\n'
+                        "}"
+                    )
+                    decision = self.router.query_json("intent_router", query, system_prompt=tool_prompt)
+                    if decision and isinstance(decision, dict):
                         s_name = decision.get("server_name")
                         t_name = decision.get("tool_name")
                         t_args = decision.get("arguments", {})
-                        res = mcp_client.call_tool(s_name, t_name, t_args)
-                        res_summary = res.get("output") or res.get("result") or ("Success" if res.get("ok") else res.get("error"))
-                        return {
-                            "text": f"MCP tool '{t_name}' executed on server '{s_name}'. Result: {res_summary}",
-                            "action": "tier2_mcp",
-                            "data": res,
-                        }
-                    except Exception as e:
-                        return {"text": f"MCP execution notice: {e}", "action": "tier2_mcp", "data": {}}
+                        if s_name and t_name:
+                            res = mcp_client.call_tool(s_name, t_name, t_args)
+                            res_summary = res.get("output") or res.get("result") or ("Success" if res.get("ok") else res.get("error"))
+                            return {
+                                "text": f"MCP tool '{t_name}' executed on server '{s_name}'. Result: {res_summary}",
+                                "action": "tier2_mcp",
+                                "data": res,
+                            }
+            except Exception as e:
+                return {"text": f"MCP execution notice: {e}", "action": "tier2_mcp", "data": {}}
 
-                elif intent == "tier3_vision_gui":
-                    try:
-                        from agent_os.state_machine import os_agent
-                        result = os_agent.run_task(query)
-                        return {
-                            "text": result.get("summary", "GUI operation finished, sir."),
-                            "action": "tier3_vision_gui",
-                            "data": result,
-                        }
-                    except Exception as e:
-                        return {"text": f"Vision agent notice: {e}", "action": "tier3_vision_gui", "data": {}}
-
-                elif intent == "web_research":
-                    try:
-                        from automation.web_agent import web_agent
-                        result = web_agent.research(query)
-                        return {
-                            "text": result.get("summary", "Web research completed, sir."),
-                            "action": "web_research",
-                            "data": result,
-                        }
-                    except Exception as e:
-                        return {"text": f"Web researcher notice: {e}", "action": "web_research", "data": {}}
-
-                elif intent == "workspace_rag":
-                    try:
-                        from integrations.workspace_rag import workspace_rag
-                        result = workspace_rag.query(query)
-                        return {
-                            "text": result.get("answer", "Workspace search completed, sir."),
-                            "action": "workspace_rag",
-                            "data": result,
-                        }
-                    except Exception as e:
-                        return {"text": f"Workspace RAG notice: {e}", "action": "workspace_rag", "data": {}}
-
-                return {
-                    "text": reply or "Right away, sir.",
-                    "action": intent,
-                    "data": parsed,
-                }
-        except Exception as e:
-            print(f"[Engine] Intent triage fallback: {e}")
-
-        # Fallback to direct conversational response with multi-turn memory
+        # 3. Direct single LLM call for all general questions & chat
         self.context.add_user_message(query)
         ctx_messages = self.context.get_messages()
         resp = self.router.dispatch_role("qa_chat", ctx_messages)
-        answer = resp.text
-        if answer:
-            self.context.add_assistant_message(answer)
+        text_out = (resp.text or "").strip() if resp else ""
+
+        refusal_signatures = [
+            "cannot predict the future",
+            "can't predict the future",
+            "not yet known",
+            "cutoff",
+            "knowledge cutoff",
+            "training data ends",
+            "as an ai",
+            "i cannot provide real-time",
+            "do not have access to real-time",
+            "don't have access to real-time",
+            "i do not have real-time",
+            "i don't have real-time",
+        ]
+        placeholder_signatures = [
+            "let me check that for you",
+            "let me check",
+            "i can help with that",
+            "right away, sir",
+            "working on it, sir",
+            "as you wish, sir",
+            "at once, sir",
+        ]
+
+        needs_web_fallback = False
+        if not text_out:
+            needs_web_fallback = True
+        elif any(sig in text_out.lower() for sig in refusal_signatures):
+            needs_web_fallback = True
+        elif len(text_out) < 40 and any(ps in text_out.lower() for ps in placeholder_signatures):
+            needs_web_fallback = True
+
+        if needs_web_fallback:
+            try:
+                from automation.web_agent import web_agent
+                result = web_agent.research(query)
+                web_summary = result.get("summary")
+                if web_summary and web_summary.strip():
+                    self.context.add_assistant_message(web_summary)
+                    return {
+                        "text": web_summary,
+                        "action": "web_research",
+                        "data": result,
+                    }
+            except Exception as e:
+                print(f"[Engine] Web agent fallback notice: {e}")
+
+        final_text = text_out or "I am listening, sir. How may I assist you?"
+        self.context.add_assistant_message(final_text)
         return {
-            "text": answer or "I am listening, sir. How may I assist you?",
+            "text": final_text,
             "action": "general_qa",
             "data": {},
         }

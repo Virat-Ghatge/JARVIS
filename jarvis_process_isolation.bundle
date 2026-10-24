@@ -1,0 +1,1336 @@
+<bundle name="jarvis_2_0_process_isolation">
+
+<file path="config/settings.py">
+import os
+import json
+import socket
+import time
+import threading
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+CONFIG_DIR = BASE_DIR / "config"
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+VAULT_PATH = CONFIG_DIR / "api_vault.json"
+MEETINGS_PATH = CONFIG_DIR / "meetings.json"
+SUMMARIES_PATH = CONFIG_DIR / "meeting_summaries.json"
+ALARMS_PATH = CONFIG_DIR / "alarms.json"
+SKILLS_PATH = CONFIG_DIR / "skills.json"
+MCP_PATH = CONFIG_DIR / "mcp_servers.json"
+BROWSER_PROFILE_DIR = BASE_DIR / ".browser_profile"
+
+DEFAULT_VAULT: Dict[str, Any] = {
+    "providers": {
+        "gemini": {"keys": [], "active_index": 0, "default_model": "gemini-2.5-flash"},
+        "groq": {"keys": [], "active_index": 0, "default_model": "llama-3.3-70b-versatile"},
+        "anthropic": {"keys": [], "active_index": 0, "default_model": "claude-3-5-sonnet-latest"},
+        "openai": {"keys": [], "active_index": 0, "default_model": "gpt-4o-mini"}
+    },
+    "custom_endpoints": [
+        {
+            "id": "freellmapi_local",
+            "name": "FREELLMAPI Local Server",
+            "base_url": "http://127.0.0.1:8000/v1",
+            "api_key": "sk-local-free",
+            "default_model": "default",
+            "enabled": True,
+            "min_request_interval_ms": 65
+        }
+    ],
+    "role_mappings": {
+        "chat": "custom:freellmapi_local",
+        "router": "custom:freellmapi_local",
+        "code_synth": "custom:freellmapi_local",
+        "vision_agent": "gemini",
+        "meeting_summarizer": "custom:freellmapi_local"
+    }
+}
+
+_vault_lock = threading.RLock()
+_net_cache = {"online": True, "last_checked": 0.0, "checking": False}
+
+
+def ensure_json_file(path: Path, default_data: Any) -> None:
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, indent=2)
+
+
+def init_config_files() -> None:
+    ensure_json_file(VAULT_PATH, DEFAULT_VAULT)
+    ensure_json_file(MEETINGS_PATH, [])
+    ensure_json_file(SUMMARIES_PATH, [])
+    ensure_json_file(ALARMS_PATH, [])
+    ensure_json_file(SKILLS_PATH, [])
+    ensure_json_file(MCP_PATH, [])
+    BROWSER_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    _seed_env_keys()
+
+
+def _seed_env_keys() -> None:
+    vault = load_vault()
+    changed = False
+    env_map = {
+        "GEMINI_API_KEY": "gemini",
+        "GROQ_API_KEY": "groq",
+        "ANTHROPIC_API_KEY": "anthropic",
+        "OPENAI_API_KEY": "openai",
+    }
+    for env_var, provider in env_map.items():
+        val = os.environ.get(env_var, "").strip()
+        if val and provider in vault.get("providers", {}):
+            keys = vault["providers"][provider].get("keys", [])
+            if not any(k.get("key") == val for k in keys):
+                keys.append({
+                    "id": f"env_{provider}_1",
+                    "label": f"ENV {env_var}",
+                    "key": val,
+                    "status": "standby",
+                    "calls": 0,
+                    "errors": 0
+                })
+                vault["providers"][provider]["keys"] = keys
+                changed = True
+    if changed:
+        save_vault(vault)
+
+
+def load_vault() -> Dict[str, Any]:
+    with _vault_lock:
+        ensure_json_file(VAULT_PATH, DEFAULT_VAULT)
+        try:
+            with open(VAULT_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for k, v in DEFAULT_VAULT.items():
+                if k not in data:
+                    data[k] = v
+            return data
+        except Exception:
+            return json.loads(json.dumps(DEFAULT_VAULT))
+
+
+def save_vault(vault_data: Dict[str, Any]) -> Dict[str, Any]:
+    with _vault_lock:
+        with open(VAULT_PATH, "w", encoding="utf-8") as f:
+            json.dump(vault_data, f, indent=2)
+        return vault_data
+
+
+def is_local_endpoint_url(url: str) -> bool:
+    if not url:
+        return False
+    lowered = url.lower()
+    return (
+        "127.0.0.1" in lowered
+        or "localhost" in lowered
+        or "0.0.0.0" in lowered
+        or "192.168." in lowered
+        or "10." in lowered
+    )
+
+
+def is_role_bound_to_local_endpoint(role: str = "chat") -> bool:
+    vault = load_vault()
+    target = vault.get("role_mappings", {}).get(role, "")
+    if target.startswith("custom:"):
+        ep_id = target.split(":", 1)[1]
+        for ep in vault.get("custom_endpoints", []):
+            if ep.get("id") == ep_id and ep.get("enabled", True):
+                return is_local_endpoint_url(ep.get("base_url", ""))
+    return False
+
+
+def _refresh_internet_status_async() -> None:
+    if _net_cache["checking"]:
+        return
+    _net_cache["checking"] = True
+
+    def _probe():
+        online = False
+        for host in ("1.1.1.1", "8.8.8.8"):
+            try:
+                with socket.create_connection((host, 53), timeout=1.2):
+                    online = True
+                    break
+            except OSError:
+                continue
+        _net_cache["online"] = online
+        _net_cache["last_checked"] = time.time()
+        _net_cache["checking"] = False
+
+    t = threading.Thread(target=_probe, daemon=True)
+    t.start()
+
+
+def is_internet_connected(role: Optional[str] = None) -> bool:
+    """
+    Non-blocking connectivity check.
+    Never blocks the FastAPI event loop and never marks local custom endpoints offline.
+    """
+    if role and is_role_bound_to_local_endpoint(role):
+        return True
+
+    now = time.time()
+    if now - _net_cache["last_checked"] > 15.0:
+        _refresh_internet_status_async()
+    return bool(_net_cache["online"])
+</file>
+
+<file path="agent_os/os_actuator.py">
+import time
+import threading
+from typing import Optional, Callable, Dict, Any
+
+try:
+    import pyautogui
+    pyautogui.FAILSAFE = True
+    pyautogui.PAUSE = 0.05
+except Exception:
+    pyautogui = None
+
+try:
+    from pynput import keyboard
+except Exception:
+    keyboard = None
+
+
+class OSActuator:
+    """
+    Tier 3 OS GUI Actuator with strictly task-scoped [ESC] emergency kill-switch.
+    Never registers a global WH_KEYBOARD_LL hook at module import time.
+    """
+
+    def __init__(self, on_abort_callback: Optional[Callable[[], None]] = None):
+        self._abort_event = threading.Event()
+        self._listener: Optional[Any] = None
+        self._lock = threading.Lock()
+        self._on_abort_callback = on_abort_callback
+
+    @property
+    def is_aborted(self) -> bool:
+        return self._abort_event.is_set()
+
+    def reset_abort(self) -> None:
+        self._abort_event.clear()
+
+    def trigger_abort(self) -> None:
+        self._abort_event.set()
+        if self._on_abort_callback:
+            try:
+                self._on_abort_callback()
+            except Exception:
+                pass
+
+    def start_esc_guard(self) -> None:
+        """Starts the low-level [ESC] listener ONLY while an active OS Agent task is running."""
+        with self._lock:
+            self._abort_event.clear()
+            if keyboard is None or self._listener is not None:
+                return
+
+            def _on_press(key):
+                try:
+                    if key == keyboard.Key.esc:
+                        self.trigger_abort()
+                        return False
+                except Exception:
+                    pass
+                return True
+
+            self._listener = keyboard.Listener(on_press=_on_press)
+            self._listener.daemon = True
+            self._listener.start()
+
+    def stop_esc_guard(self) -> None:
+        """Unhooks WH_KEYBOARD_LL immediately when the OS Agent task finishes."""
+        with self._lock:
+            if self._listener is not None:
+                try:
+                    self._listener.stop()
+                except Exception:
+                    pass
+                self._listener = None
+
+    def execute_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        if self.is_aborted:
+            return {"status": "aborted", "detail": "Emergency [ESC] kill-switch triggered."}
+
+        if pyautogui is None:
+            return {"status": "error", "detail": "PyAutoGUI is unavailable in this environment."}
+
+        act_type = str(action.get("action", "")).lower().strip()
+        try:
+            if act_type == "click":
+                x = int(action.get("x", 0))
+                y = int(action.get("y", 0))
+                button = str(action.get("button", "left"))
+                clicks = int(action.get("clicks", 1))
+                pyautogui.click(x=x, y=y, clicks=clicks, button=button)
+                return {"status": "ok", "detail": f"Clicked ({x}, {y}) [{button} x{clicks}]"}
+
+            elif act_type == "double_click":
+                x = int(action.get("x", 0))
+                y = int(action.get("y", 0))
+                pyautogui.doubleClick(x=x, y=y)
+                return {"status": "ok", "detail": f"Double-clicked ({x}, {y})"}
+
+            elif act_type == "type":
+                text = str(action.get("text", ""))
+                press_enter = bool(action.get("press_enter", False))
+                if "x" in action and "y" in action:
+                    pyautogui.click(x=int(action["x"]), y=int(action["y"]))
+                    time.sleep(0.1)
+                pyautogui.write(text, interval=0.02)
+                if press_enter:
+                    pyautogui.press("enter")
+                return {"status": "ok", "detail": f"Typed {len(text)} chars"}
+
+            elif act_type == "hotkey":
+                keys = action.get("keys", [])
+                if isinstance(keys, str):
+                    keys = [k.strip() for k in keys.split("+") if k.strip()]
+                pyautogui.hotkey(*keys)
+                return {"status": "ok", "detail": f"Hotkey {'+'.join(keys)}"}
+
+            elif act_type == "scroll":
+                amount = int(action.get("amount", -300))
+                pyautogui.scroll(amount)
+                return {"status": "ok", "detail": f"Scrolled {amount}"}
+
+            elif act_type == "wait":
+                seconds = float(action.get("seconds", 1.0))
+                time.sleep(min(seconds, 10.0))
+                return {"status": "ok", "detail": f"Waited {seconds}s"}
+
+            elif act_type in ("done", "complete", "finish"):
+                return {"status": "done", "detail": action.get("reason", "Goal achieved.")}
+
+            return {"status": "error", "detail": f"Unknown OS action type: {act_type}"}
+        except Exception as exc:
+            return {"status": "error", "detail": f"Actuator exception: {exc}"}
+</file>
+
+<file path="agent_os/worker_proc.py">
+import sys
+import json
+import time
+import traceback
+from typing import Dict, Any
+
+from agent_os.os_actuator import OSActuator
+from agent_os.ui_distiller import UIDistiller
+from agent_os.som_vision import SoMVision
+from core.llm_router import LLMRouter
+from core.adapters.base import extract_json_from_text
+
+
+def emit_event(event_type: str, payload: Dict[str, Any]) -> None:
+    line = json.dumps({"event": event_type, "payload": payload}, ensure_ascii=False)
+    sys.stdout.write(line + "\n")
+    sys.stdout.flush()
+
+
+def run_worker_loop(goal: str, max_steps: int = 8) -> None:
+    router = LLMRouter()
+    distiller = UIDistiller()
+    som = SoMVision()
+    actuator = OSActuator(
+        on_abort_callback=lambda: emit_event(
+            "AGENT_STEP",
+            {
+                "tier": "TIER_3_VISION",
+                "phase": "ABORTED",
+                "message": "Emergency [ESC] kill-switch pressed by user.",
+                "timestamp": time.time(),
+            },
+        )
+    )
+
+    actuator.start_esc_guard()
+    try:
+        emit_event(
+            "AGENT_STEP",
+            {
+                "tier": "TIER_3_VISION",
+                "phase": "OBSERVE",
+                "message": f"Starting isolated OS Agent worker for goal: {goal}",
+                "timestamp": time.time(),
+            },
+        )
+
+        history = []
+        for step_idx in range(1, max_steps + 1):
+            if actuator.is_aborted:
+                emit_event("RESULT", {"status": "aborted", "summary": "Task aborted via [ESC]."})
+                return
+
+            ui_elements = distiller.extract_interactive_elements()
+            som_snapshot = som.capture_and_annotate(ui_elements)
+
+            emit_event(
+                "AGENT_STEP",
+                {
+                    "tier": "TIER_3_VISION",
+                    "phase": "THINK",
+                    "step": step_idx,
+                    "elements_count": len(ui_elements),
+                    "screenshot_b64": som_snapshot.get("image_b64", ""),
+                    "message": f"Step {step_idx}: Distilled {len(ui_elements)} interactive UI elements.",
+                    "timestamp": time.time(),
+                },
+            )
+
+            prompt = (
+                f"You are the JARVIS Tier 3 OS GUI Agent.\n"
+                f"User Goal: {goal}\n"
+                f"Current Step: {step_idx}/{max_steps}\n"
+                f"Previous Steps: {json.dumps(history[-4:])}\n"
+                f"Visible UI Elements (Set-of-Mark IDs with center coordinates):\n"
+                f"{json.dumps(ui_elements[:60], ensure_ascii=False)}\n\n"
+                "Respond ONLY with a valid JSON object matching one of:\n"
+                '{"action": "click", "x": 120, "y": 340, "reason": "..."}\n'
+                '{"action": "type", "x": 120, "y": 340, "text": "...", "press_enter": true, "reason": "..."}\n'
+                '{"action": "hotkey", "keys": ["ctrl", "l"], "reason": "..."}\n'
+                '{"action": "wait", "seconds": 1.5, "reason": "..."}\n'
+                '{"action": "done", "reason": "Goal completed"}'
+            )
+
+            raw_reply = router.generate(
+                role="vision_agent",
+                prompt=prompt,
+                image_b64=som_snapshot.get("image_b64"),
+            )
+            decision = extract_json_from_text(raw_reply) or {"action": "done", "reason": str(raw_reply)}
+
+            if str(decision.get("action", "")).lower() in ("done", "complete", "finish"):
+                emit_event(
+                    "AGENT_STEP",
+                    {
+                        "tier": "TIER_3_VISION",
+                        "phase": "VERIFY",
+                        "step": step_idx,
+                        "message": decision.get("reason", "OS Agent task complete."),
+                        "timestamp": time.time(),
+                    },
+                )
+                emit_event(
+                    "RESULT",
+                    {"status": "completed", "summary": decision.get("reason", "Task completed.")},
+                )
+                return
+
+            emit_event(
+                "AGENT_STEP",
+                {
+                    "tier": "TIER_3_VISION",
+                    "phase": "ACT",
+                    "step": step_idx,
+                    "action": decision,
+                    "message": decision.get("reason", f"Executing {decision.get('action')}"),
+                    "timestamp": time.time(),
+                },
+            )
+
+            outcome = actuator.execute_action(decision)
+            history.append({"step": step_idx, "decision": decision, "outcome": outcome})
+            time.sleep(0.45)
+
+        emit_event(
+            "RESULT",
+            {"status": "max_steps", "summary": f"Reached maximum steps ({max_steps}) for goal: {goal}"},
+        )
+    except Exception as exc:
+        emit_event(
+            "RESULT",
+            {
+                "status": "error",
+                "summary": f"OS Agent worker failed: {exc}",
+                "trace": traceback.format_exc(),
+            },
+        )
+    finally:
+        actuator.stop_esc_guard()
+
+
+if __name__ == "__main__":
+    raw_in = sys.stdin.readline()
+    params = json.loads(raw_in) if raw_in.strip() else {}
+    run_worker_loop(
+        goal=params.get("goal", ""),
+        max_steps=int(params.get("max_steps", 8)),
+    )
+</file>
+
+<file path="agent_os/state_machine.py">
+import sys
+import json
+import subprocess
+import threading
+from pathlib import Path
+from typing import Callable, List, Dict, Any, Optional
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+class OSAgentStateMachine:
+    """
+     Tier 3 OS Agent Supervisor.
+    Spawns `agent_os/worker_proc.py` in a child Python process so COM/UIA/mss/pynput
+    never block the FastAPI asyncio loop or share the main process GIL.
+    """
+
+    def __init__(self, safety_interceptor: Optional[Any] = None):
+        self.safety_interceptor = safety_interceptor
+        self._step_listeners: List[Callable[[Dict[str, Any]], None]] = []
+        self._active_proc: Optional[subprocess.Popen] = None
+        self._proc_lock = threading.Lock()
+
+    def register_step_listener(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+        if callback not in self._step_listeners:
+            self._step_listeners.append(callback)
+
+    def _emit_step(self, payload: Dict[str, Any]) -> None:
+        for cb in list(self._step_listeners):
+            try:
+                cb(payload)
+            except Exception:
+                pass
+
+    def abort_current_task(self) -> bool:
+        with self._proc_lock:
+            if self._active_proc and self._active_proc.poll() is None:
+                try:
+                    self._active_proc.terminate()
+                    self._active_proc.wait(timeout=2.0)
+                except Exception:
+                    try:
+                        self._active_proc.kill()
+                    except Exception:
+                        pass
+                self._active_proc = None
+                self._emit_step(
+                    {
+                        "tier": "TIER_3_VISION",
+                        "phase": "ABORTED",
+                        "message": "OS Agent subprocess terminated by user abort.",
+                    }
+                )
+                return True
+        return False
+
+    def execute_goal(self, goal: str, max_steps: int = 8) -> Dict[str, Any]:
+        if self.safety_interceptor is not None:
+            approved, reason = self.safety_interceptor.check_and_request_approval(
+                tier="TIER_3_VISION", command_desc=goal
+            )
+            if not approved:
+                msg = f"Action blocked by Safety Interceptor: {reason}"
+                self._emit_step({"tier": "TIER_3_VISION", "phase": "BLOCKED", "message": msg})
+                return {"status": "blocked", "summary": msg}
+
+        self.abort_current_task()
+
+        cmd = [sys.executable, "-m", "agent_os.worker_proc"]
+        final_result: Dict[str, Any] = {"status": "completed", "summary": "OS Agent task finished."}
+
+        with self._proc_lock:
+            self._active_proc = subprocess.Popen(
+                cmd,
+                cwd=str(BASE_DIR),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                bufsize=1,
+            )
+            proc = self._active_proc
+
+        try:
+            assert proc.stdin is not None
+            assert proc.stdout is not None
+            proc.stdin.write(json.dumps({"goal": goal, "max_steps": max_steps}) + "\n")
+            proc.stdin.flush()
+            proc.stdin.close()
+
+            for raw_line in proc.stdout:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                except Exception:
+                    continue
+
+                ev = msg.get("event")
+                payload = msg.get("payload", {})
+                if ev == "AGENT_STEP":
+                    self._emit_step(payload)
+                elif ev == "RESULT":
+                    final_result = payload
+
+            proc.wait(timeout=5.0)
+        except Exception as exc:
+            final_result = {"status": "error", "summary": f"OS Agent supervisor error: {exc}"}
+        finally:
+            with self._proc_lock:
+                if self._active_proc is proc:
+                    self._active_proc = None
+
+        return final_result
+</file>
+
+<file path="automation/meeting_worker.py">
+import sys
+import json
+import time
+import threading
+import traceback
+from pathlib import Path
+from typing import Dict, Any, List
+
+from config.settings import BROWSER_PROFILE_DIR
+
+_command_state = {"leave_requested": False, "setup_mode": False}
+
+
+def emit(event_type: str, payload: Dict[str, Any]) -> None:
+    sys.stdout.write(json.dumps({"event": event_type, "payload": payload}, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
+def _stdin_watcher() -> None:
+    for line in sys.stdin:
+        raw = line.strip()
+        if not raw:
+            continue
+        try:
+            cmd = json.loads(raw)
+            if cmd.get("command") == "leave":
+                _command_state["leave_requested"] = True
+                break
+        except Exception:
+            continue
+
+
+def _mute_and_join_google_meet(page: Any) -> None:
+    time.sleep(2.5)
+    for hotkey in ("Control+d", "Control+e"):
+        try:
+            page.keyboard.press(hotkey)
+            time.sleep(0.3)
+        except Exception:
+            pass
+
+    join_selectors = [
+        "button:has-text('Join now')",
+        "button:has-text('Ask to join')",
+        "button:has-text('Switch here')",
+    ]
+    for sel in join_selectors:
+        try:
+            loc = page.locator(sel).first
+            if loc.is_visible(timeout=1500):
+                loc.click()
+                break
+        except Exception:
+            continue
+
+
+def _mute_and_join_teams(page: Any) -> None:
+    time.sleep(3.0)
+    join_selectors = [
+        "button:has-text('Join now')",
+        "button[data-tid='prejoin-join-button']",
+    ]
+    for sel in join_selectors:
+        try:
+            loc = page.locator(sel).first
+            if loc.is_visible(timeout=2000):
+                loc.click()
+                break
+        except Exception:
+            continue
+
+
+def _scrape_live_captions(page: Any, transcript_log: List[Dict[str, str]], seen_lines: set) -> None:
+    selectors = [
+        "div[jscontroller] span",
+        "[ data-tid='closed-captions-renderer'] span",
+        ".iOzk7",
+        ".a4cQT",
+    ]
+    for sel in selectors:
+        try:
+            nodes = page.locator(sel).all_inner_texts()
+            for text in nodes[-6:]:
+                cleaned = " ".join(text.strip().split())
+                if len(cleaned) > 4 and cleaned not in seen_lines:
+                    seen_lines.add(cleaned)
+                    entry = {"timestamp": time.strftime("%H:%M:%S"), "text": cleaned}
+                    transcript_log.append(entry)
+                    emit("CAPTION", entry)
+        except Exception:
+            continue
+
+
+def run_meeting_session(config: Dict[str, Any]) -> None:
+    url = config.get("url", "https://accounts.google.com")
+    meeting_id = config.get("meeting_id", f"mtg_{int(time.time())}")
+    title = config.get("title", "Live Meeting")
+    setup_only = bool(config.get("setup_only", False))
+
+    watcher = threading.Thread(target=_stdin_watcher, daemon=True)
+    watcher.start()
+
+    transcript_log: List[Dict[str, str]] = []
+    seen_lines: set = set()
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:
+        emit("ERROR", {"meeting_id": meeting_id, "error": f"Playwright import failed: {exc}"})
+        return
+
+    try:
+        with sync_playwright() as p:
+            BROWSER_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=str(BROWSER_PROFILE_DIR),
+                headless=False,
+                args=[
+                    "--use-fake-ui-for-media-stream",
+                    "--disable-notifications",
+                    "--mute-audio",
+                ],
+            )
+            page = context.pages[0] if context.pages else context.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=45000)
+
+            emit(
+                "STATUS",
+                {
+                    "status": "setup" if setup_only else "in_meeting",
+                    "meeting_id": meeting_id,
+                    "title": title,
+                    "url": url,
+                },
+            )
+
+            if not setup_only:
+                if "meet.google.com" in url:
+                    _mute_and_join_google_meet(page)
+                elif "teams.microsoft.com" in url or "teams.live.com" in url:
+                    _mute_and_join_teams(page)
+
+            while not _command_state["leave_requested"]:
+                if page.is_closed():
+                    break
+                if not setup_only:
+                    _scrape_live_captions(page, transcript_log, seen_lines)
+                time.sleep(1.5)
+
+            try:
+                context.close()
+            except Exception:
+                pass
+
+        emit(
+            "FINISHED",
+            {
+                "meeting_id": meeting_id,
+                "title": title,
+                "url": url,
+                "setup_only": setup_only,
+                "transcript": transcript_log,
+            },
+        )
+    except Exception as exc:
+        emit(
+            "ERROR",
+            {
+                "meeting_id": meeting_id,
+                "title": title,
+                "error": str(exc),
+                "trace": traceback.format_exc(),
+                "transcript": transcript_log,
+            },
+        )
+
+
+if __name__ == "__main__":
+    first_line = sys.stdin.readline()
+    cfg = json.loads(first_line) if first_line.strip() else {}
+    run_meeting_session(cfg)
+</file>
+
+<file path="automation/meeting_bot.py">
+import sys
+import json
+import time
+import threading
+import subprocess
+from datetime import datetime
+from typing import Callable, Dict, Any, List, Optional
+
+from config.settings import BASE_DIR, SUMMARIES_PATH, ensure_json_file
+
+
+class MeetingBot:
+    """
+    Subprocess-isolated Meeting Bot supervisor.
+    Launches `automation.meeting_worker` in its own Python process so sync_playwright
+    greenlets never collide with FastAPI/uvicorn or freeze the main process.
+    """
+
+    def __init__(self, llm_router: Optional[Any] = None, voice_listener: Optional[Any] = None):
+        self.llm_router = llm_router
+        self.voice_listener = voice_listener
+        self._state_listeners: List[Callable[[Dict[str, Any]], None]] = []
+        self._proc: Optional[subprocess.Popen] = None
+        self._lock = threading.RLock()
+        self._current_state: Dict[str, Any] = {
+            "status": "idle",
+            "meeting_id": None,
+            "title": None,
+            "url": None,
+            "captions": [],
+            "mic_auto_muted": False,
+        }
+        ensure_json_file(SUMMARIES_PATH, [])
+
+    def register_state_listener(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+        if callback not in self._state_listeners:
+            self._state_listeners.append(callback)
+
+    def _broadcast_state(self) -> None:
+        snapshot = dict(self._current_state)
+        for cb in list(self._state_listeners):
+            try:
+                cb(snapshot)
+            except Exception:
+                pass
+
+    def get_state(self) -> Dict[str, Any]:
+        with self._lock:
+            return dict(self._current_state)
+
+    def open_login_setup(self, url: str = "https://accounts.google.com") -> Dict[str, Any]:
+        return self.join_meeting(
+            url=url,
+            meeting_id="browser_profile_setup",
+            title="Browser Profile Login Setup",
+            setup_only=True,
+        )
+
+    def join_meeting(
+        self,
+        url: str,
+        meeting_id: Optional[str] = None,
+        title: str = "Instant Meeting",
+        setup_only: bool = False,
+    ) -> Dict[str, Any]:
+        with self._lock:
+            if self._proc and self._proc.poll() is None:
+                return {"status": "busy", "message": "Meeting bot is already active.", "state": self.get_state()}
+
+            mid = meeting_id or f"mtg_{int(time.time())}"
+
+            # Auto-mute JARVIS listening microphone on meeting join while still allowing manual user unmute
+            auto_muted = False
+            if not setup_only and self.voice_listener is not None:
+                try:
+                    if hasattr(self.voice_listener, "enter_meeting_auto_mute"):
+                        self.voice_listener.enter_meeting_auto_mute()
+                    elif hasattr(self.voice_listener, "set_mic_active"):
+                        self.voice_listener.set_mic_active(False)
+                    auto_muted = True
+                except Exception:
+                    pass
+
+            self._current_state = {
+                "status": "joining",
+                "meeting_id": mid,
+                "title": title,
+                "url": url,
+                "captions": [],
+                "mic_auto_muted": auto_muted,
+            }
+            self._broadcast_state()
+
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "automation.meeting_worker"],
+                cwd=str(BASE_DIR),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                bufsize=1,
+            )
+            self._proc = proc
+
+            assert proc.stdin is not None
+            proc.stdin.write(
+                json.dumps(
+                    {
+                        "url": url,
+                        "meeting_id": mid,
+                        "title": title,
+                        "setup_only": setup_only,
+                    }
+                )
+                + "\n"
+            )
+            proc.stdin.flush()
+
+            monitor = threading.Thread(target=self._monitor_worker, args=(proc,), daemon=True)
+            monitor.start()
+
+            return {"status": "started", "meeting_id": mid, "state": self.get_state()}
+
+    def leave_meeting(self) -> Dict[str, Any]:
+        with self._lock:
+            proc = self._proc
+            if not proc or proc.poll() is None is False:
+                self._current_state["status"] = "idle"
+                self._broadcast_state()
+                return {"status": "idle", "message": "No active meeting session."}
+
+            try:
+                if proc.stdin:
+                    proc.stdin.write(json.dumps({"command": "leave"}) + "\n")
+                    proc.stdin.flush()
+            except Exception:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+
+        return {"status": "leaving", "state": self.get_state()}
+
+    def _monitor_worker(self, proc: subprocess.Popen) -> None:
+        try:
+            assert proc.stdout is not None
+            for raw_line in proc.stdout:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                except Exception:
+                    continue
+
+                ev = msg.get("event")
+                payload = msg.get("payload", {})
+
+                if ev == "STATUS":
+                    with self._lock:
+                        self._current_state["status"] = payload.get("status", "in_meeting")
+                        self._broadcast_state()
+                elif ev == "CAPTION":
+                    with self._lock:
+                        caps = self._current_state.get("captions", [])
+                        caps.append(payload)
+                        self._current_state["captions"] = caps[-100:]
+                        self._broadcast_state()
+                elif ev == "FINISHED":
+                    self._handle_post_call(payload)
+                elif ev == "ERROR":
+                    with self._lock:
+                        self._current_state["status"] = "error"
+                        self._current_state["error"] = payload.get("error", "Unknown meeting worker error")
+                        self._broadcast_state()
+        finally:
+            with self._lock:
+                if self._proc is proc:
+                    self._proc = None
+                self._current_state["status"] = "idle"
+                self._current_state["mic_auto_muted"] = False
+                self._broadcast_state()
+
+    def _handle_post_call(self, payload: Dict[str, Any]) -> None:
+        if payload.get("setup_only"):
+            return
+
+        transcript_items = payload.get("transcript", [])
+        full_text = "\n".join(f"[{c.get('timestamp', '')}] {c.get('text', '')}" for c in transcript_items)
+        summary_text = "No live captions were captured during this session."
+
+        if full_text.strip() and self.llm_router is not None:
+            try:
+                prompt = (
+                    "Summarize the following meeting transcript with:\n"
+                    "1. Executive Summary\n2. Key Decisions\n3. Action Items\n\n"
+                    f"Transcript:\n{full_text[:12000]}"
+                )
+                summary_text = self.llm_router.generate(role="meeting_summarizer", prompt=prompt)
+            except Exception as exc:
+                summary_text = f"Automated summary generation failed: {exc}"
+
+        record = {
+            "id": f"sum_{int(time.time())}",
+            "meeting_id": payload.get("meeting_id"),
+            "title": payload.get("title", "Meeting"),
+            "url": payload.get("url", ""),
+            "ended_at": datetime.now().isoformat(),
+            "captions_count": len(transcript_items),
+            "summary": summary_text,
+            "transcript": transcript_items,
+        }
+
+        try:
+            with open(SUMMARIES_PATH, "r", encoding="utf-8") as f:
+                summaries = json.load(f)
+        except Exception:
+            summaries = []
+
+        summaries.insert(0, record)
+        with open(SUMMARIES_PATH, "w", encoding="utf-8") as f:
+            json.dump(summaries[:100], f, indent=2)
+
+    def list_summaries(self) -> List[Dict[str, Any]]:
+        try:
+            with open(SUMMARIES_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+</file>
+
+<file path="audio/voice_listener.py">
+import time
+import threading
+from typing import Callable, Optional, Dict, Any
+
+try:
+    import speech_recognition as sr
+except Exception:
+    sr = None
+
+
+class VoiceListener:
+    """
+    Thread-safe SpeechRecognition listener with lazy start (no import-time thread spawning),
+    independent `mic_active` toggle, and meeting auto-mute interlock with manual user override.
+    """
+
+    def __init__(self, on_transcript: Optional[Callable[[str], None]] = None):
+        self.on_transcript = on_transcript
+        self.mic_active: bool = False
+        self.in_meeting_auto_muted: bool = False
+        self.status_detail: str = "Standby"
+        self._stop_event = threading.Event()
+        self._worker_thread: Optional[threading.Thread] = None
+        self._lock = threading.RLock()
+        self._state_listener: Optional[Callable[[Dict[str, Any]], None]] = None
+
+    def register_state_listener(self, cb: Callable[[Dict[str, Any]], None]) -> None:
+        self._state_listener = cb
+
+    def get_state(self) -> Dict[str, Any]:
+        return {
+            "mic_active": self.mic_active,
+            "in_meeting_auto_muted": self.in_meeting_auto_muted,
+            "status_detail": self.status_detail,
+        }
+
+    def _notify(self) -> None:
+        if self._state_listener:
+            try:
+                self._state_listener(self.get_state())
+            except Exception:
+                pass
+
+    def ensure_worker_started(self) -> None:
+        with self._lock:
+            if self._worker_thread is not None and self._worker_thread.is_alive():
+                return
+            self._stop_event.clear()
+            self._worker_thread = threading.Thread(target=self._listen_loop, daemon=True)
+            self._worker_thread.start()
+
+    def set_mic_active(self, active: bool, manual_override: bool = True) -> Dict[str, Any]:
+        with self._lock:
+            self.mic_active = bool(active)
+            if manual_override and active:
+                self.in_meeting_auto_muted = False
+            self.status_detail = "Listening" if self.mic_active else "Muted"
+            if self.mic_active:
+                self.ensure_worker_started()
+            self._notify()
+            return self.get_state()
+
+    def enter_meeting_auto_mute(self) -> Dict[str, Any]:
+        """Auto-mutes JARVIS mic when joining a meeting; user can still manually unmute anytime."""
+        with self._lock:
+            self.in_meeting_auto_muted = True
+            self.mic_active = False
+            self.status_detail = "Auto-Muted (In Meeting)"
+            self._notify()
+            return self.get_state()
+
+    def shutdown(self) -> None:
+        self._stop_event.set()
+        self.mic_active = False
+
+    def _listen_loop(self) -> None:
+        if sr is None:
+            self.status_detail = "SpeechRecognition Unavailable"
+            self._notify()
+            return
+
+        recognizer = sr.Recognizer()
+        recognizer.dynamic_energy_threshold = True
+
+        while not self._stop_event.is_set():
+            if not self.mic_active:
+                time.sleep(0.25)
+                continue
+
+            try:
+                with sr.Microphone() as source:
+                    audio = recognizer.listen(source, timeout=3.0, phrase_time_limit=10.0)
+                if not self.mic_active:
+                    continue
+                text = recognizer.recognize_google(audio).strip()
+                if text and self.on_transcript:
+                    self.on_transcript(text)
+            except Exception:
+                time.sleep(0.2)
+</file>
+
+<file path="main.py">
+import os
+import sys
+import time
+import socket
+import signal
+import shutil
+import subprocess
+import webbrowser
+from pathlib import Path
+from typing import Optional, List
+
+import uvicorn
+
+from config.settings import init_config_files
+
+HOST = "127.0.0.1"
+PORT = 5050
+APP_URL = f"http://{HOST}:{PORT}"
+BASE_DIR = Path(__file__).resolve().parent
+UI_DIST_INDEX = BASE_DIR / "ui" / "dist" / "index.html"
+
+
+def is_port_listening(host: str, port: int, timeout: float = 0.5) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def wait_for_server_ready(host: str, port: int, max_wait_sec: float = 15.0) -> bool:
+    deadline = time.time() + max_wait_sec
+    while time.time() < deadline:
+        if is_port_listening(host, port):
+            return True
+        time.sleep(0.15)
+    return False
+
+
+def find_chromium_binary() -> Optional[str]:
+    """Locates Chrome or Edge executable to run JARVIS HUD in isolated `--app` mode."""
+    candidates: List[str] = []
+    if sys.platform.startswith("win"):
+        prog_files = [
+            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+            os.environ.get("LOCALAPPDATA", ""),
+        ]
+        rel_paths = [
+            r"Google\Chrome\Application\chrome.exe",
+            r"Microsoft\Edge\Application\msedge.exe",
+            r"BraveSoftware\Brave-Browser\Application\brave.exe",
+        ]
+        for root in prog_files:
+            if not root:
+                continue
+            for rel in rel_paths:
+                full = os.path.join(root, rel)
+                if os.path.isfile(full):
+                    candidates.append(full)
+
+    for binary_name in ("chrome", "google-chrome", "msedge", "chromium", "chromium-browser"):
+        resolved = shutil.which(binary_name)
+        if resolved:
+            candidates.append(resolved)
+
+    return candidates[0] if candidates else None
+
+
+def launch_hud_app_window(url: str) -> Optional[subprocess.Popen]:
+    """
+    Launches the JARVIS HUD in Chromium's multi-process `--app` mode so UI rendering
+    never shares a process or GIL with Python/FastAPI.
+    """
+    browser_bin = find_chromium_binary()
+    hud_profile_dir = BASE_DIR / ".hud_app_profile"
+    hud_profile_dir.mkdir(parents=True, exist_ok=True)
+
+    if browser_bin:
+        args = [
+            browser_bin,
+            f"--app={url}",
+            f"--user-data-dir={hud_profile_dir}",
+            "--window-size=1440,900",
+            "--disable-features=Translate",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ]
+        try:
+            return subprocess.Popen(
+                args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception as exc:
+            print(f"[JARVIS Supervisor] Chromium --app launch failed ({exc}); falling back to default browser.")
+
+    webbrowser.open(url)
+    return None
+
+
+def ensure_frontend_built() -> None:
+    if UI_DIST_INDEX.exists():
+        return
+    ui_dir = BASE_DIR / "ui"
+    if (ui_dir / "package.json").exists():
+        npm_cmd = "npm.cmd" if sys.platform.startswith("win") else "npm"
+        if shutil.which(npm_cmd):
+            print("[JARVIS Supervisor] ui/dist missing; building React HUD via npm run build...")
+            subprocess.run([npm_cmd, "run", "build"], cwd=str(ui_dir), check=False)
+
+
+def run_backend_server() -> subprocess.Popen:
+    cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "automation.server:app",
+        "--host",
+        HOST,
+        "--port",
+        str(PORT),
+        "--log-level",
+        "info",
+    ]
+    return subprocess.Popen(cmd, cwd=str(BASE_DIR))
+
+
+def main() -> None:
+    init_config_files()
+    ensure_frontend_built()
+
+    if "--server-only" in sys.argv:
+        uvicorn.run("automation.server:app", host=HOST, port=PORT, log_level="info")
+        return
+
+    print(f"[JARVIS 2.0 Supervisor] Starting FastAPI + WebSocket backend on {APP_URL} ...")
+    backend_proc = run_backend_server()
+    hud_proc: Optional[subprocess.Popen] = None
+
+    def _graceful_shutdown(*_args):
+        print("\n[JARVIS 2.0 Supervisor] Shutting down HUD and backend processes...")
+        if hud_proc and hud_proc.poll() is None:
+            try:
+                hud_proc.terminate()
+            except Exception:
+                pass
+        if backend_proc.poll() is None:
+            try:
+                backend_proc.terminate()
+                backend_proc.wait(timeout=4.0)
+            except Exception:
+                try:
+                    backend_proc.kill()
+                except Exception:
+                    pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _graceful_shutdown)
+    signal.signal(signal.SIGTERM, _graceful_shutdown)
+
+    if not wait_for_server_ready(HOST, PORT, max_wait_sec=20.0):
+        print("[JARVIS 2.0 Supervisor] ERROR: Backend failed to bind to 127.0.0.1:5050.")
+        _graceful_shutdown()
+
+    print("[JARVIS 2.0 Supervisor] Backend online. Launching Chromium --app Holographic HUD...")
+    hud_proc = launch_hud_app_window(APP_URL)
+
+    try:
+        while True:
+            if backend_proc.poll() is not None:
+                print("[JARVIS 2.0 Supervisor] Backend process exited. Closing supervisor.")
+                break
+            if hud_proc is not None and hud_proc.poll() is not None:
+                print("[JARVIS 2.0 Supervisor] HUD window closed by user. Stopping backend...")
+                break
+            time.sleep(0.5)
+    finally:
+        _graceful_shutdown()
+
+
+if __name__ == "__main__":
+    main()
+</file>
+
+<file path="tests/test_process_isolation.py">
+import unittest
+from config.settings import is_local_endpoint_url, is_internet_connected
+from agent_os.os_actuator import OSActuator
+from audio.voice_listener import VoiceListener
+
+
+class TestJarvisProcessIsolation(unittest.TestCase):
+    def test_local_endpoint_detection(self):
+        self.assertTrue(is_local_endpoint_url("http://127.0.0.1:8000/v1"))
+        self.assertTrue(is_local_endpoint_url("http://localhost:11434/v1"))
+        self.assertFalse(is_local_endpoint_url("https://api.openai.com/v1"))
+
+    def test_actuator_does_not_hook_on_import_or_init(self):
+        actuator = OSActuator()
+        self.assertIsNone(actuator._listener)
+        actuator.start_esc_guard()
+        actuator.stop_esc_guard()
+        self.assertIsNone(actuator._listener)
+
+    def test_meeting_auto_mute_and_manual_override(self):
+        vl = VoiceListener()
+        vl.set_mic_active(True)
+        self.assertTrue(vl.get_state()["mic_active"])
+
+        # Auto-mute when meeting starts
+        vl.enter_meeting_auto_mute()
+        self.assertFalse(vl.get_state()["mic_active"])
+        self.assertTrue(vl.get_state()["in_meeting_auto_muted"])
+
+        # User can manually unmute during meeting
+        vl.set_mic_active(True, manual_override=True)
+        self.assertTrue(vl.get_state()["mic_active"])
+        self.assertFalse(vl.get_state()["in_meeting_auto_muted"])
+        vl.shutdown()
+
+    def test_non_blocking_connectivity_check(self):
+        res = is_internet_connected(role="chat")
+        self.assertIsInstance(res, bool)
+
+
+if __name__ == "__main__":
+    unittest.main()
+</file>
+
+</bundle>

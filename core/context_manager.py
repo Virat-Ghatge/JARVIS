@@ -4,6 +4,7 @@ Conversation Memory & Context Window Manager for JARVIS 2.0
 Maintains conversation history, trims context windows, and formats messages for adapters.
 """
 
+from datetime import datetime
 import threading
 from typing import List, Optional
 from core.adapters.base import ChatMessage
@@ -43,7 +44,13 @@ class ContextManager:
         with self._lock:
             messages = []
             if self._system_prompt:
-                messages.append(ChatMessage(role="system", content=self._system_prompt))
+                now_dt = datetime.now()
+                dynamic_sys = (
+                    f"{self._system_prompt}\n"
+                    f"Current System Date & Time: {now_dt.strftime('%A, %B %d, %Y at %I:%M %p')} (Current Year: {now_dt.year}).\n"
+                    "CRITICAL RULE: Never say 'Let me check that for you' or 'I can help with that' without actually providing the full answer in the same message."
+                )
+                messages.append(ChatMessage(role="system", content=dynamic_sys))
             messages.extend(list(self._history))
             return messages
 

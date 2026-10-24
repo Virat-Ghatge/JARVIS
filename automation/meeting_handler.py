@@ -12,7 +12,7 @@ Follows the same pattern as AlarmHandler, WeatherHandler, etc.:
 import re
 import threading
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Import meeting sub-modules
 try:
@@ -50,20 +50,70 @@ class MeetingHandler:
     def schedule_meeting(self, command: str):
         """
         Parse a voice/chat scheduling command and add the meeting.
+        Supports recurrence (daily till <date>), duration, and AI fallback parsing.
         e.g. "schedule Team Standup at 2:30 PM with link https://meet.google.com/abc"
         """
         result = self.scheduler.parse_schedule_command(command)
+        if not result:
+            # AI Fallback via core.llm_router.router
+            try:
+                from core.llm_router import router
+                sys_prompt = (
+                    "Extract meeting schedule details from the user command as JSON with keys:\n"
+                    "- title: string\n"
+                    "- meeting_url: string\n"
+                    "- start_time_iso: string (ISO 8601 local timestamp YYYY-MM-DDTHH:MM:SS)\n"
+                    "- duration_minutes: int (default 60)\n"
+                    "- recurrence_days: int (default 1)\n"
+                    f"Current time is {datetime.now().isoformat()}."
+                )
+                ai_data = router.query_json("intent_router", command, system_prompt=sys_prompt)
+                if ai_data and ai_data.get("meeting_url") and ai_data.get("start_time_iso"):
+                    st = datetime.fromisoformat(ai_data["start_time_iso"])
+                    dur = int(ai_data.get("duration_minutes", 60))
+                    et = st + timedelta(minutes=dur)
+                    rec = int(ai_data.get("recurrence_days", 1))
+                    result = {
+                        "title": ai_data.get("title", "Online Meeting"),
+                        "meeting_url": ai_data["meeting_url"],
+                        "start_time": st,
+                        "end_time": et,
+                        "duration_minutes": dur,
+                        "recurrence_days": rec,
+                    }
+            except Exception as e:
+                print(f"[MeetingHandler] AI fallback schedule parsing error: {e}")
+
         if result:
-            meeting = self.scheduler.add_meeting(
-                title=result["title"],
-                meeting_url=result["meeting_url"],
-                start_time=result["start_time"],
-            )
-            time_str = result["start_time"].strftime("%I:%M %p")
-            self.jarvis.speak(
-                f"Meeting '{meeting['title']}' scheduled for {time_str}, sir. "
-                f"I'll join automatically 60 seconds beforehand."
-            )
+            rec_days = result.get("recurrence_days", 1)
+            start_base = result["start_time"]
+            end_base = result.get("end_time") or (start_base + timedelta(hours=1))
+            time_str = start_base.strftime("%I:%M %p")
+
+            if rec_days > 1:
+                for d in range(rec_days):
+                    st = start_base + timedelta(days=d)
+                    et = end_base + timedelta(days=d)
+                    self.scheduler.add_meeting(
+                        title=result["title"],
+                        meeting_url=result["meeting_url"],
+                        start_time=st,
+                        end_time=et,
+                    )
+                self.jarvis.speak(
+                    f"Scheduled '{result['title']}' daily for {rec_days} days starting at {time_str}, sir."
+                )
+            else:
+                meeting = self.scheduler.add_meeting(
+                    title=result["title"],
+                    meeting_url=result["meeting_url"],
+                    start_time=start_base,
+                    end_time=end_base,
+                )
+                self.jarvis.speak(
+                    f"Meeting '{meeting['title']}' scheduled for {time_str}, sir. "
+                    f"I'll join automatically 60 seconds beforehand."
+                )
         else:
             self.jarvis.speak(
                 "I couldn't parse that schedule command, sir. "
@@ -145,6 +195,7 @@ class MeetingHandler:
                 url=meeting["meeting_url"],
                 end_time=end_time,
                 auto_leave=meeting.get("auto_leave", True),
+                title=meeting.get("title", "Online Meeting"),
             )
         except Exception as e:
             print(f"[MeetingHandler] Join error: {e}")

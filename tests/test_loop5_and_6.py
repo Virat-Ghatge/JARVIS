@@ -321,6 +321,187 @@ class TestLoop5And6(unittest.TestCase):
         # Context should be empty
         self.assertEqual(len(engine.context._history), 0)
 
+    # ── NEW: FIX 5 — Regression Tests for Critical Fixes ─────────────
+    def test_current_year_deterministic(self):
+        """Verify 'what year is it now' returns '2026' deterministically and never '2024'."""
+        from core.engine import engine
+        from datetime import datetime
+
+        res = engine.process_command("what year is it now", source="test")
+        self.assertIn("2026", res.get("text", ""))
+        self.assertNotIn("2024", res.get("text", ""))
+        self.assertEqual(res.get("action"), "get_date")
+        self.assertEqual(res.get("data", {}).get("year"), datetime.now().year)
+
+        res_which = engine.process_command("which year is it", source="test")
+        self.assertIn("2026", res_which.get("text", ""))
+        self.assertEqual(res_which.get("action"), "get_date")
+
+    def test_is_internet_connected_performance(self):
+        """Verify is_internet_connected() executes in < 5ms (non-blocking cached read)."""
+        import time
+        from config.settings import is_internet_connected
+
+        durations = []
+        for _ in range(25):
+            t0 = time.perf_counter()
+            state = is_internet_connected()
+            durations.append((time.perf_counter() - t0) * 1000)
+
+        avg_ms = sum(durations) / len(durations)
+        max_ms = max(durations)
+        self.assertLess(avg_ms, 5.0, f"Average execution time {avg_ms:.3f}ms exceeds 5ms limit")
+        self.assertLess(max_ms, 10.0, f"Max execution time {max_ms:.3f}ms is unexpectedly high")
+        self.assertIsInstance(state, bool)
+
+    def test_malformed_llm_intent_string_sanitization(self):
+        """Verify malformed LLM intent strings never leak into the action field."""
+        from core.engine import engine
+
+        res = engine._finalize_response(
+            text="Testing response text",
+            source="test",
+            action="general_qai systems are active...",
+            data={},
+        )
+        self.assertNotEqual(res.get("action"), "general_qai systems are active...")
+        self.assertEqual(res.get("action"), "general_qa")
+
+    def test_current_events_web_research_routing(self):
+        """Verify queries about 'most heard song 2025 on spotify' route to live web_research."""
+        from core.engine import engine
+        from unittest.mock import patch
+
+        with patch("automation.web_agent.web_agent.research") as mock_research:
+            mock_research.return_value = {
+                "ok": True,
+                "topic": "most heard song 2025 on spotify",
+                "summary": "In 2025, the most streamed song on Spotify was 'Birds of a Feather' by Billie Eilish.",
+                "sources": ["https://spotify.com"],
+            }
+            res = engine.process_command("most heard song 2025 on spotify", source="test")
+            self.assertEqual(res.get("action"), "web_research")
+            self.assertIn("Billie Eilish", res.get("text", ""))
+            self.assertNotIn("cannot predict the future", res.get("text", "").lower())
+            mock_research.assert_called_once()
+
+    def test_extract_json_from_text(self):
+        """Verify extract_json_from_text parses fenced code blocks and embedded JSON objects."""
+        from core.adapters.base import extract_json_from_text
+
+        fenced = "```json\n{\"intent\": \"general_qa\", \"target\": \"test\"}\n```"
+        data = extract_json_from_text(fenced)
+        self.assertEqual(data, {"intent": "general_qa", "target": "test"})
+
+        embedded = "Here is the response: {\"intent\": \"web_research\"} and more text."
+        data2 = extract_json_from_text(embedded)
+        self.assertEqual(data2, {"intent": "web_research"})
+
+        invalid = "No json here."
+        self.assertIsNone(extract_json_from_text(invalid))
+
+    def test_context_manager_dynamic_year_injection(self):
+        """Verify ContextManager dynamically injects the current year and real-time clock into system messages."""
+        from core.context_manager import ContextManager
+        from datetime import datetime
+
+        cm = ContextManager()
+        messages = cm.get_messages()
+        self.assertGreaterEqual(len(messages), 1)
+        self.assertEqual(messages[0].role, "system")
+        self.assertIn(f"Current Year: {datetime.now().year}", messages[0].content)
+        self.assertIn("CRITICAL RULE: Never say 'Let me check that for you'", messages[0].content)
+
+
+    def test_parse_schedule_command_recurrence_and_quoted_title(self):
+        """Verify scheduler.parse_schedule_command extracts quoted title, strips url quotes, and handles recurrence."""
+        from automation.meeting_scheduler import MeetingScheduler
+        scheduler = MeetingScheduler()
+        cmd = 'schedule a meeting named "cn" with link "https://teams.microsoft.com/l/meetup-join/123" at 2:30 PM, daily till 13th nov'
+        parsed = scheduler.parse_schedule_command(cmd)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["title"], "cn")
+        self.assertEqual(parsed["meeting_url"], "https://teams.microsoft.com/l/meetup-join/123")
+        self.assertFalse(parsed["meeting_url"].endswith('"'))
+        self.assertGreater(parsed.get("recurrence_days", 1), 1)
+
+    def test_api_meetings_join_transitions_status(self):
+        """Verify POST /api/meetings/{id}/join transitions meeting status from pending to active."""
+        from datetime import datetime, timedelta
+        from core.engine import engine
+
+        if not getattr(engine, "meeting_handler", None):
+            from automation.meeting_handler import MeetingHandler
+            engine.meeting_handler = MeetingHandler(engine)
+
+        scheduler = engine.meeting_handler.scheduler
+        start = datetime.now() + timedelta(hours=2)
+        m = scheduler.add_meeting(
+            title="Status Transition Test",
+            meeting_url="https://meet.google.com/test-join-status",
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+        )
+        mid = m["id"]
+        self.assertEqual(m["status"], "pending")
+
+        bot = engine.meeting_handler.bot
+        orig_join = getattr(bot, "join_meeting", None)
+        if bot:
+            bot.join_meeting = lambda *args, **kwargs: None
+
+        try:
+            res = self.client.post(f"/api/meetings/{mid}/join")
+            self.assertEqual(res.status_code, 200)
+            self.assertTrue(res.json().get("ok"))
+            updated = scheduler.get_by_id(mid)
+            self.assertIsNotNone(updated)
+            self.assertIn(updated["status"], ("active", "completed"))
+        finally:
+            if bot and orig_join:
+                bot.join_meeting = orig_join
+            self.client.delete(f"/api/meetings/{mid}")
+
+    def test_api_meetings_bulk_import(self):
+        """Verify POST /api/meetings/bulk imports multiple meetings into the scheduler."""
+        from datetime import datetime, timedelta
+        from core.engine import engine
+
+        if not getattr(engine, "meeting_handler", None):
+            from automation.meeting_handler import MeetingHandler
+            engine.meeting_handler = MeetingHandler(engine)
+
+        scheduler = engine.meeting_handler.scheduler
+        t1 = (datetime.now() + timedelta(days=1)).isoformat()
+        t2 = (datetime.now() + timedelta(days=2)).isoformat()
+        entries = [
+            {
+                "title": "Bulk Sync A",
+                "meeting_url": "https://meet.google.com/bulk-aaa",
+                "start_time": t1,
+            },
+            {
+                "title": "Bulk Sync B",
+                "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+                "start_time": t2,
+            },
+        ]
+        res = self.client.post("/api/meetings/bulk", json=entries)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data.get("ok"))
+        self.assertEqual(data.get("count"), 2)
+
+        all_meetings = scheduler.get_all()
+        titles = [m["title"] for m in all_meetings]
+        self.assertIn("Bulk Sync A", titles)
+        self.assertIn("Bulk Sync B", titles)
+
+        # Cleanup
+        for m in all_meetings:
+            if m["title"] in ("Bulk Sync A", "Bulk Sync B"):
+                self.client.delete(f"/api/meetings/{m['id']}")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

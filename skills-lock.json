@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "skill-router": {
+      "source": "Liber1917/skill-router",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "4f5c6e02e8820318bacb601c548f30d5fa306f75661f4a737dc170208b382d04"
+    }
+  }
+}

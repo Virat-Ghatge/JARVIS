@@ -8,13 +8,15 @@ telemetry and command streaming over WebSockets.
 import asyncio
 import json
 import os
+import subprocess
+import sys
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -398,11 +400,100 @@ def api_delete_meeting(meeting_id: str):
         return {"ok": True}
     return {"ok": False}
 
+@app.post("/api/meetings/{meeting_id}/join")
+def api_join_meeting_by_id(meeting_id: str):
+    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
+    bot = getattr(engine, "meeting_handler", None) and engine.meeting_handler.bot
+    if not scheduler:
+        raise HTTPException(status_code=500, detail="Meeting scheduler not available")
+    meeting = scheduler.get_by_id(meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    # Mark active immediately to avoid race with poller
+    scheduler.mark_active(meeting_id)
+    et = meeting.get("end_time")
+    end_dt = None
+    if isinstance(et, str):
+        try:
+            end_dt = datetime.fromisoformat(et.replace("Z", "+00:00"))
+            if end_dt.tzinfo is not None:
+                end_dt = end_dt.astimezone().replace(tzinfo=None)
+        except Exception:
+            end_dt = None
+    elif isinstance(et, datetime):
+        end_dt = et
+
+    def _join_worker():
+        try:
+            if bot:
+                bot.join_meeting(
+                    url=meeting["meeting_url"],
+                    end_time=end_dt,
+                    auto_leave=meeting.get("auto_leave", True),
+                    title=meeting.get("title", "Online Meeting"),
+                )
+        except Exception as err:
+            print(f"[Server] Join error: {err}")
+        finally:
+            scheduler.mark_completed(meeting_id)
+
+    if bot:
+        threading.Thread(target=_join_worker, daemon=True).start()
+    else:
+        import webbrowser
+        webbrowser.open(meeting["meeting_url"])
+    return {"ok": True, "status": "joining"}
+
+@app.post("/api/meetings/{meeting_id}/cancel")
+def api_cancel_meeting_by_id(meeting_id: str):
+    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
+    if not scheduler:
+        raise HTTPException(status_code=500, detail="Meeting scheduler not available")
+    ok = scheduler.cancel_meeting(meeting_id)
+    return {"ok": ok, "status": "cancelled" if ok else "not_found"}
+
+@app.post("/api/meetings/bulk")
+async def api_bulk_import_meetings(request: Request):
+    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
+    if not scheduler:
+        raise HTTPException(status_code=500, detail="Meeting scheduler not available")
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = []
+
+    if isinstance(payload, dict) and "meetings" in payload:
+        entries = payload["meetings"]
+    elif isinstance(payload, list):
+        entries = payload
+    else:
+        entries = []
+    count = scheduler.bulk_import(entries)
+    return {"ok": True, "count": count}
+
+@app.post("/api/meetings/setup")
+def api_meeting_setup():
+    try:
+        proc = MeetingBot.run_account_setup_async()
+        return {"ok": True, "pid": proc.pid, "message": "Browser account setup launched"}
+    except Exception as e:
+        cmd = [sys.executable, "-m", "automation.meeting_bot", "--setup"]
+        p = subprocess.Popen(cmd)
+        return {"ok": True, "pid": p.pid, "message": f"Browser account setup launched: {e}"}
+
 @app.post("/api/meetings/join-url")
 def api_join_meeting_url(req: JoinMeetingRequest):
     bot = getattr(engine, "meeting_handler", None) and engine.meeting_handler.bot
     if bot:
-        threading.Thread(target=bot.join_meeting, kwargs={"url": req.url, "title": req.title or "Online Meeting"}, daemon=True).start()
+        threading.Thread(
+            target=bot.join_meeting,
+            kwargs={
+                "url": req.url,
+                "title": req.title or "Online Meeting",
+            },
+            daemon=True,
+        ).start()
     else:
         import webbrowser
         webbrowser.open(req.url)
@@ -411,8 +502,12 @@ def api_join_meeting_url(req: JoinMeetingRequest):
 @app.post("/api/meetings/leave")
 def api_leave_meeting():
     bot = getattr(engine, "meeting_handler", None) and engine.meeting_handler.bot
+    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
     if bot:
         bot.leave_meeting()
+    if scheduler:
+        for m in scheduler.get_active():
+            scheduler.mark_completed(m["id"])
     return {"ok": True}
 
 @app.get("/api/alarms")

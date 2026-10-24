@@ -1,5 +1,47 @@
 [
   {
+    "id": "sum-1792658724",
+    "title": "Quarterly Roadmap Review",
+    "date": "2026-10-22 14:15",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline."
+  },
+  {
+    "id": "sum-1792658648",
+    "title": "Quarterly Roadmap Review",
+    "date": "2026-10-22 14:14",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline."
+  },
+  {
+    "id": "sum-1792656585",
+    "title": "named \"cn\" with link \" , daily till 13th nov",
+    "date": "2026-10-22 13:39",
+    "captions_count": 3,
+    "summary": "### **Executive Summary**\nThis transcript captures a brief chat log from a recurring meeting series (\"cn\", daily until Nov 13) involving student **Druhi Chakraborty**. The conversation consists solely of three messages posted within a 7-minute window (11:20 AM \u2013 11:24 AM on 10/29/2025) discussing the time complexity of an algorithm, likely in response to a quiz, assignment, or lecture poll. The participant iterates through Best Case (**O(n)**), Worst Case (**O(n\u00b2)**), and Average/General Case (**O(n log n)**). No other participants, decisions, or administrative topics are present in the log.\n\n---\n\n### **Key Decisions Made**\n*   **None.** The transcript contains only technical answers posted by a single attendee. No agreements, approvals, or strategic decisions were recorded.\n\n---\n\n### **Action Items & Next Steps**\n*   **None identified.** The log does not contain assigned tasks, deadlines, or follow-up requests.\n*   **Contextual Note:** If this chat was part of a graded activity (e.g., a live quiz), the instructor/TA may need to verify the submission timestamp (10/29/2025) and the correctness of the final answer provided (**O(n log n)**)."
+  },
+  {
+    "id": "sum-1792653861",
+    "title": "Quarterly Roadmap Review",
+    "date": "2026-10-22 12:54",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline."
+  },
+  {
+    "id": "sum-1792653849",
+    "title": "Quarterly Roadmap Review",
+    "date": "2026-10-22 12:54",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline."
+  },
+  {
+    "id": "sum-1792653286",
+    "title": "Quarterly Roadmap Review",
+    "date": "2026-10-22 12:44",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline."
+  },
+  {
     "id": "sum-1792603650",
     "title": "Quarterly Roadmap Review",
     "date": "2026-10-21 22:57",

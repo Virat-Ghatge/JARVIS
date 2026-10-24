@@ -1,122 +1,183 @@
-#!/usr/bin/env python3
-"""
-JARVIS 2.0 Main Entry Point
-Launches the FastAPI backend server, background APScheduler, and VoiceListener,
-then opens the Marvel Holographic HUD inside a native PyWebView frameless window.
-Supports --cli for headless terminal-only mode.
-"""
-
-import sys
 import os
-import threading
+import sys
 import time
+import socket
+import signal
+import shutil
+import subprocess
+import webbrowser
+from pathlib import Path
+from typing import Optional, List
+
 import uvicorn
 
-# Ensure project root is in sys.path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config.settings import init_config_files
 
-from automation.server import app as fastapi_app
-from audio.voice_listener import voice_listener
-from audio.tts_engine import tts_engine
-from core.engine import engine
+HOST = "127.0.0.1"
+PORT = 5050
+APP_URL = f"http://{HOST}:{PORT}"
+BASE_DIR = Path(__file__).resolve().parent
+UI_DIST_INDEX = BASE_DIR / "ui" / "dist" / "index.html"
 
-class JarvisWindowApi:
-    def __init__(self):
-        self.window = None
 
-    def set_mini_mode(self, enabled: bool):
-        if not self.window:
-            return False
-        try:
-            if enabled:
-                self.window.resize(520, 140)
-                self.window.on_top = True
-            else:
-                self.window.resize(1360, 860)
-                self.window.on_top = False
+def is_port_listening(host: str, port: int, timeout: float = 0.5) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
             return True
-        except Exception as e:
-            print(f"[JarvisWindowApi] set_mini_mode error: {e}")
-            return False
+    except OSError:
+        return False
 
 
-def start_backend():
-    """Runs the FastAPI server in a background thread."""
-    uvicorn.run(fastapi_app, host="127.0.0.1", port=5050, log_level="warning")
+def wait_for_server_ready(host: str, port: int, max_wait_sec: float = 15.0) -> bool:
+    deadline = time.time() + max_wait_sec
+    while time.time() < deadline:
+        if is_port_listening(host, port):
+            return True
+        time.sleep(0.15)
+    return False
 
-def main():
-    print("=" * 60)
-    print(" J.A.R.V.I.S. 2.0 — Autonomous OS Agent & Holographic HUD")
-    print("=" * 60)
 
-    # 1. Start FastAPI Backend in background thread
-    server_thread = threading.Thread(target=start_backend, daemon=True, name="FastAPI-Server")
-    server_thread.start()
-    print("[Main] Backend server operational at http://127.0.0.1:5050")
+def find_chromium_binary() -> Optional[str]:
+    """Locates Chrome or Edge executable to run JARVIS HUD in isolated `--app` mode."""
+    candidates: List[str] = []
+    if sys.platform.startswith("win"):
+        prog_files = [
+            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+            os.environ.get("LOCALAPPDATA", ""),
+        ]
+        rel_paths = [
+            r"Google\Chrome\Application\chrome.exe",
+            r"Microsoft\Edge\Application\msedge.exe",
+            r"BraveSoftware\Brave-Browser\Application\brave.exe",
+        ]
+        for root in prog_files:
+            if not root:
+                continue
+            for rel in rel_paths:
+                full = os.path.join(root, rel)
+                if os.path.isfile(full):
+                    candidates.append(full)
 
-    # 2. Wire Meeting Handler (single source of truth on engine — no duplicate instances)
-    meeting_handler = getattr(engine, "meeting_handler", None)
-    print("[Main] Meeting scheduler & Playwright attendant online")
+    for binary_name in ("chrome", "google-chrome", "msedge", "chromium", "chromium-browser"):
+        resolved = shutil.which(binary_name)
+        if resolved:
+            candidates.append(resolved)
 
-    # 3. Start Voice Listener
-    voice_listener.start()
-    print("[Main] Voice listener active")
+    return candidates[0] if candidates else None
 
-    # Check CLI mode flag
-    if "--cli" in sys.argv:
-        print("[Main] Running in CLI terminal mode. Type commands below (Ctrl+C to exit):")
+
+def launch_hud_app_window(url: str) -> Optional[subprocess.Popen]:
+    """
+    Launches the JARVIS HUD in Chromium's multi-process `--app` mode so UI rendering
+    never shares a process or GIL with Python/FastAPI.
+    """
+    browser_bin = find_chromium_binary()
+    hud_profile_dir = BASE_DIR / ".hud_app_profile"
+    hud_profile_dir.mkdir(parents=True, exist_ok=True)
+
+    if browser_bin:
+        args = [
+            browser_bin,
+            f"--app={url}",
+            f"--user-data-dir={hud_profile_dir}",
+            "--window-size=1440,900",
+            "--disable-features=Translate",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ]
         try:
-            while True:
-                q = input("\nOperator > ")
-                if q.lower() in ("exit", "quit", "shutdown"):
-                    break
-                res = engine.process_command(q, source="text")
-                print(f"JARVIS > {res.get('text', '')}")
-        except KeyboardInterrupt:
-            pass
-        finally:
-            voice_listener.stop()
-            if meeting_handler:
-                meeting_handler.shutdown()
-            print("\n[Main] JARVIS shutdown complete.")
+            return subprocess.Popen(
+                args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception as exc:
+            print(f"[JARVIS Supervisor] Chromium --app launch failed ({exc}); falling back to default browser.")
+
+    webbrowser.open(url)
+    return None
+
+
+def ensure_frontend_built() -> None:
+    if UI_DIST_INDEX.exists():
+        return
+    ui_dir = BASE_DIR / "ui"
+    if (ui_dir / "package.json").exists():
+        npm_cmd = "npm.cmd" if sys.platform.startswith("win") else "npm"
+        if shutil.which(npm_cmd):
+            print("[JARVIS Supervisor] ui/dist missing; building React HUD via npm run build...")
+            subprocess.run([npm_cmd, "run", "build"], cwd=str(ui_dir), check=False)
+
+
+def run_backend_server() -> subprocess.Popen:
+    cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "automation.server:app",
+        "--host",
+        HOST,
+        "--port",
+        str(PORT),
+        "--log-level",
+        "info",
+    ]
+    return subprocess.Popen(cmd, cwd=str(BASE_DIR))
+
+
+def main() -> None:
+    init_config_files()
+    ensure_frontend_built()
+
+    if "--server-only" in sys.argv:
+        uvicorn.run("automation.server:app", host=HOST, port=PORT, log_level="info")
         return
 
-    # 4. Launch Native PyWebView Desktop HUD Window
-    try:
-        import webview
-        print("[Main] Launching native PyWebView Desktop HUD...")
-        
-        js_api = JarvisWindowApi()
-        # Create frameless/styled native window pointing to FastAPI server
-        window = webview.create_window(
-            title="J.A.R.V.I.S. 2.0",
-            url="http://127.0.0.1:5050",
-            width=1360,
-            height=860,
-            min_size=(400, 120),
-            background_color="#060A12",
-            resizable=True,
-            confirm_close=False,
-            js_api=js_api,
-        )
-        js_api.window = window
+    print(f"[JARVIS 2.0 Supervisor] Starting FastAPI + WebSocket backend on {APP_URL} ...")
+    backend_proc = run_backend_server()
+    hud_proc: Optional[subprocess.Popen] = None
 
-        webview.start(debug=False)
-    except Exception as e:
-        print(f"[Main] PyWebView launch notice ({e}). Falling back to browser app mode...")
-        import webbrowser
-        webbrowser.open("http://127.0.0.1:5050")
-        try:
-            while server_thread.is_alive():
-                time.sleep(1)
-        except KeyboardInterrupt:
-            pass
+    def _graceful_shutdown(*_args):
+        print("\n[JARVIS 2.0 Supervisor] Shutting down HUD and backend processes...")
+        if hud_proc and hud_proc.poll() is None:
+            try:
+                hud_proc.terminate()
+            except Exception:
+                pass
+        if backend_proc.poll() is None:
+            try:
+                backend_proc.terminate()
+                backend_proc.wait(timeout=4.0)
+            except Exception:
+                try:
+                    backend_proc.kill()
+                except Exception:
+                    pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _graceful_shutdown)
+    signal.signal(signal.SIGTERM, _graceful_shutdown)
+
+    if not wait_for_server_ready(HOST, PORT, max_wait_sec=20.0):
+        print("[JARVIS 2.0 Supervisor] ERROR: Backend failed to bind to 127.0.0.1:5050.")
+        _graceful_shutdown()
+
+    print("[JARVIS 2.0 Supervisor] Backend online. Launching Chromium --app Holographic HUD...")
+    hud_proc = launch_hud_app_window(APP_URL)
+
+    try:
+        while True:
+            if backend_proc.poll() is not None:
+                print("[JARVIS 2.0 Supervisor] Backend process exited. Closing supervisor.")
+                break
+            if hud_proc is not None and hud_proc.poll() is not None:
+                print("[JARVIS 2.0 Supervisor] HUD window closed by user. Stopping backend...")
+                break
+            time.sleep(0.5)
     finally:
-        voice_listener.stop()
-        if meeting_handler:
-            meeting_handler.shutdown()
-        print("[Main] JARVIS shutdown complete.")
+        _graceful_shutdown()
+
 
 if __name__ == "__main__":
     main()
-

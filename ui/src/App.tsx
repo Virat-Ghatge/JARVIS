@@ -237,13 +237,22 @@ const App: React.FC = () => {
     } catch { /* offline */ }
   }, []);
 
-  const joinMeeting = useCallback(async (url: string, title?: string) => {
+  const joinMeeting = useCallback(async (url: string, title?: string, id?: string) => {
     try {
-      await fetch(`${API_BASE}/api/meetings/join-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, title: title || 'Online Meeting' }),
-      });
+      if (id) {
+        await fetch(`${API_BASE}/api/meetings/${id}/join`, {
+          method: 'POST',
+        });
+      } else {
+        await fetch(`${API_BASE}/api/meetings/join-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, title: title || 'Online Meeting' }),
+        });
+      }
+      const res = await fetch(`${API_BASE}/api/meetings`);
+      const data = await res.json();
+      setMeetings(data.meetings || []);
     } catch { /* offline */ }
   }, []);
 
@@ -341,6 +350,7 @@ const App: React.FC = () => {
             onDeleteMeeting={deleteMeeting}
             onJoinMeeting={joinMeeting}
             onLeaveMeeting={leaveMeeting}
+            apiBase={API_BASE}
           />
         );
       case 'vault':

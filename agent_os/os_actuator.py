@@ -1,157 +1,131 @@
-#!/usr/bin/env python3
-"""
-OS Actuator for JARVIS 2.0
-Executes low-level mouse, keyboard, and window controls via PyAutoGUI and pynput.
-Includes an emergency [ESC] hardware kill-switch and instant programmatic abort.
-"""
-
-import threading
 import time
-from typing import List, Optional, Union
+import threading
+from typing import Optional, Callable, Dict, Any
 
 try:
     import pyautogui
-    pyautogui.FAILSAFE = True  # Move mouse to corner to abort
+    pyautogui.FAILSAFE = True
     pyautogui.PAUSE = 0.05
-    PYAUTOGUI_AVAILABLE = True
 except Exception:
-    PYAUTOGUI_AVAILABLE = False
+    pyautogui = None
+
+try:
+    from pynput import keyboard
+except Exception:
+    keyboard = None
 
 
 class OSActuator:
     """
-    Direct OS actuator controlling mouse clicks, keyboard keystrokes, and hotkeys.
-    Provides an emergency [ESC] kill-switch to immediately halt automated actions.
+    Tier 3 OS GUI Actuator with strictly task-scoped [ESC] emergency kill-switch.
+    Never registers a global WH_KEYBOARD_LL hook at module import time.
     """
 
-    def __init__(self):
+    def __init__(self, on_abort_callback: Optional[Callable[[], None]] = None):
+        self._abort_event = threading.Event()
+        self._listener: Optional[Any] = None
         self._lock = threading.Lock()
-        self._aborted: bool = False
-        self._esc_listener = None
-        self._start_esc_listener()
+        self._on_abort_callback = on_abort_callback
 
-    def _start_esc_listener(self) -> None:
-        """Starts a background pynput listener monitoring for the [ESC] key."""
-        try:
-            from pynput import keyboard
-
-            def on_press(key):
-                if key == keyboard.Key.esc:
-                    print("\n🚨 [OSActuator] EMERGENCY [ESC] KILL-SWITCH TRIGGERED! Halting autonomous agent.")
-                    self.abort()
-
-            self._esc_listener = keyboard.Listener(on_press=on_press)
-            self._esc_listener.daemon = True
-            self._esc_listener.start()
-        except Exception as e:
-            print(f"[OSActuator] Emergency key listener notice: {e}")
-
-    # ── Abort Controls ────────────────────────────────────────────────
-    def abort(self) -> None:
-        """Trigger emergency abort."""
-        with self._lock:
-            self._aborted = True
-
+    @property
     def is_aborted(self) -> bool:
-        """Check if abort kill-switch has been triggered."""
-        with self._lock:
-            return self._aborted
+        return self._abort_event.is_set()
 
     def reset_abort(self) -> None:
-        """Reset the abort flag before starting a new autonomous task."""
+        self._abort_event.clear()
+
+    def trigger_abort(self) -> None:
+        self._abort_event.set()
+        if self._on_abort_callback:
+            try:
+                self._on_abort_callback()
+            except Exception:
+                pass
+
+    def start_esc_guard(self) -> None:
+        """Starts the low-level [ESC] listener ONLY while an active OS Agent task is running."""
         with self._lock:
-            self._aborted = False
+            self._abort_event.clear()
+            if keyboard is None or self._listener is not None:
+                return
 
-    # ── Actuator Actions ──────────────────────────────────────────────
-    def click(self, x: int, y: int) -> bool:
-        """Left click at screen coordinates (x, y)."""
-        if self.is_aborted():
-            return False
-        if not PYAUTOGUI_AVAILABLE:
-            print(f"[OSActuator Mock] Click at ({x}, {y})")
-            return True
+            def _on_press(key):
+                try:
+                    if key == keyboard.Key.esc:
+                        self.trigger_abort()
+                        return False
+                except Exception:
+                    pass
+                return True
+
+            self._listener = keyboard.Listener(on_press=_on_press)
+            self._listener.daemon = True
+            self._listener.start()
+
+    def stop_esc_guard(self) -> None:
+        """Unhooks WH_KEYBOARD_LL immediately when the OS Agent task finishes."""
+        with self._lock:
+            if self._listener is not None:
+                try:
+                    self._listener.stop()
+                except Exception:
+                    pass
+                self._listener = None
+
+    def execute_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        if self.is_aborted:
+            return {"status": "aborted", "detail": "Emergency [ESC] kill-switch triggered."}
+
+        if pyautogui is None:
+            return {"status": "error", "detail": "PyAutoGUI is unavailable in this environment."}
+
+        act_type = str(action.get("action", "")).lower().strip()
         try:
-            pyautogui.click(x, y)
-            return True
-        except Exception as e:
-            print(f"[OSActuator] Click error: {e}")
-            return False
+            if act_type == "click":
+                x = int(action.get("x", 0))
+                y = int(action.get("y", 0))
+                button = str(action.get("button", "left"))
+                clicks = int(action.get("clicks", 1))
+                pyautogui.click(x=x, y=y, clicks=clicks, button=button)
+                return {"status": "ok", "detail": f"Clicked ({x}, {y}) [{button} x{clicks}]"}
 
-    def double_click(self, x: int, y: int) -> bool:
-        """Double click at screen coordinates (x, y)."""
-        if self.is_aborted():
-            return False
-        if not PYAUTOGUI_AVAILABLE:
-            print(f"[OSActuator Mock] Double-click at ({x}, {y})")
-            return True
-        try:
-            pyautogui.doubleClick(x, y)
-            return True
-        except Exception as e:
-            print(f"[OSActuator] Double-click error: {e}")
-            return False
+            elif act_type == "double_click":
+                x = int(action.get("x", 0))
+                y = int(action.get("y", 0))
+                pyautogui.doubleClick(x=x, y=y)
+                return {"status": "ok", "detail": f"Double-clicked ({x}, {y})"}
 
-    def right_click(self, x: int, y: int) -> bool:
-        """Right click at screen coordinates (x, y)."""
-        if self.is_aborted():
-            return False
-        if not PYAUTOGUI_AVAILABLE:
-            print(f"[OSActuator Mock] Right-click at ({x}, {y})")
-            return True
-        try:
-            pyautogui.rightClick(x, y)
-            return True
-        except Exception as e:
-            print(f"[OSActuator] Right-click error: {e}")
-            return False
+            elif act_type == "type":
+                text = str(action.get("text", ""))
+                press_enter = bool(action.get("press_enter", False))
+                if "x" in action and "y" in action:
+                    pyautogui.click(x=int(action["x"]), y=int(action["y"]))
+                    time.sleep(0.1)
+                pyautogui.write(text, interval=0.02)
+                if press_enter:
+                    pyautogui.press("enter")
+                return {"status": "ok", "detail": f"Typed {len(text)} chars"}
 
-    def type_text(self, text: str, interval: float = 0.02) -> bool:
-        """Type string into focused element."""
-        if self.is_aborted():
-            return False
-        if not PYAUTOGUI_AVAILABLE:
-            print(f"[OSActuator Mock] Type text: '{text}'")
-            return True
-        try:
-            pyautogui.typewrite(text, interval=interval)
-            return True
-        except Exception as e:
-            print(f"[OSActuator] Type text error: {e}")
-            return False
+            elif act_type == "hotkey":
+                keys = action.get("keys", [])
+                if isinstance(keys, str):
+                    keys = [k.strip() for k in keys.split("+") if k.strip()]
+                pyautogui.hotkey(*keys)
+                return {"status": "ok", "detail": f"Hotkey {'+'.join(keys)}"}
 
-    def press_hotkey(self, keys: Union[List[str], str]) -> bool:
-        """Press key combination (e.g. ['ctrl', 'c'] or 'enter')."""
-        if self.is_aborted():
-            return False
-        if isinstance(keys, str):
-            key_list = [k.strip() for k in keys.split("+")]
-        else:
-            key_list = keys
+            elif act_type == "scroll":
+                amount = int(action.get("amount", -300))
+                pyautogui.scroll(amount)
+                return {"status": "ok", "detail": f"Scrolled {amount}"}
 
-        if not PYAUTOGUI_AVAILABLE:
-            print(f"[OSActuator Mock] Hotkey: {key_list}")
-            return True
-        try:
-            pyautogui.hotkey(*key_list)
-            return True
-        except Exception as e:
-            print(f"[OSActuator] Hotkey error: {e}")
-            return False
+            elif act_type == "wait":
+                seconds = float(action.get("seconds", 1.0))
+                time.sleep(min(seconds, 10.0))
+                return {"status": "ok", "detail": f"Waited {seconds}s"}
 
-    def scroll(self, amount: int) -> bool:
-        """Scroll mouse wheel (positive up, negative down)."""
-        if self.is_aborted():
-            return False
-        if not PYAUTOGUI_AVAILABLE:
-            print(f"[OSActuator Mock] Scroll: {amount}")
-            return True
-        try:
-            pyautogui.scroll(amount)
-            return True
-        except Exception as e:
-            print(f"[OSActuator] Scroll error: {e}")
-            return False
+            elif act_type in ("done", "complete", "finish"):
+                return {"status": "done", "detail": action.get("reason", "Goal achieved.")}
 
-
-# Global actuator singleton
-os_actuator = OSActuator()
+            return {"status": "error", "detail": f"Unknown OS action type: {act_type}"}
+        except Exception as exc:
+            return {"status": "error", "detail": f"Actuator exception: {exc}"}

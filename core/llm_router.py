@@ -207,6 +207,28 @@ class LLMRouter:
 
         return LLMResponse(text="", error="Unknown generation failure", provider=provider, model=model)
 
+    def is_network_error(self, error_str: Optional[str]) -> bool:
+        """Check if an error represents a network connection failure or offline condition."""
+        if not error_str:
+            return False
+        err_lower = error_str.lower()
+        net_signatures = [
+            "connection",
+            "connect",
+            "network",
+            "timeout",
+            "timed out",
+            "unreachable",
+            "connection refused",
+            "name resolution",
+            "getaddrinfo",
+            "dns",
+            "failed to establish a new connection",
+            "offline",
+            "max retries exceeded",
+        ]
+        return any(sig in err_lower for sig in net_signatures)
+
     def dispatch_role(
         self,
         role: str,
@@ -217,16 +239,14 @@ class LLMRouter:
     ) -> LLMResponse:
         """
         Routes the request to the provider & model configured for the specified role.
-        If offline, automatically routes to offline_fallback (local Ollama).
+        Always attempts user's configured provider first.
+        Only falls back to offline_fallback if generate_with_failover returns a network/connection
+        error and provider != offline_provider.
         """
-        # Check connectivity
-        if not is_internet_connected():
-            print("[LLMRouter] Machine is offline. Switching to offline_fallback role.")
-            provider, model = get_role_target("offline_fallback")
-        else:
-            provider, model = get_role_target(role)
+        # Always attempt the user's configured (provider, model) first
+        provider, model = get_role_target(role)
 
-        return self.generate_with_failover(
+        resp = self.generate_with_failover(
             provider=provider,
             model=model,
             messages=messages,
@@ -234,6 +254,25 @@ class LLMRouter:
             max_tokens=max_tokens,
             json_mode=json_mode,
         )
+
+        # Only fall back to offline_fallback if actual network/connection error occurred
+        if resp.error and self.is_network_error(resp.error):
+            offline_provider, offline_model = get_role_target("offline_fallback")
+            if provider != offline_provider:
+                print(
+                    f"[LLMRouter] Network error on configured provider '{provider}': {resp.error}. "
+                    f"Falling back to offline_fallback ({offline_provider}/{offline_model})."
+                )
+                return self.generate_with_failover(
+                    provider=offline_provider,
+                    model=offline_model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                )
+
+        return resp
 
     def query_text(self, role: str, prompt: str, system_prompt: str = "") -> str:
         """Quick convenience method for text-to-text generation."""

@@ -1,224 +1,116 @@
-#!/usr/bin/env python3
-"""
-Tier 3 — Autonomous OS Vision & Accessibility GUI Agent for JARVIS 2.0
-Executes the Observe -> Think -> Act -> Verify loop using Multimodal Vision LLMs,
-Set-of-Mark visual grounding, accessibility tree controls, and OS actuation.
-"""
-
+import sys
 import json
+import subprocess
 import threading
-import time
-from typing import Any, Callable, Dict, List, Optional
+from pathlib import Path
+from typing import Callable, List, Dict, Any, Optional
 
-from agent_os.os_actuator import os_actuator
-from agent_os.som_vision import som_vision
-from agent_os.ui_distiller import ui_distiller
-from core.adapters.base import ChatMessage
-from core.llm_router import router
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class OSAgentStateMachine:
     """
-    Tier-3 Autonomous Visual Operating System Agent.
+     Tier 3 OS Agent Supervisor.
+    Spawns `agent_os/worker_proc.py` in a child Python process so COM/UIA/mss/pynput
+    never block the FastAPI asyncio loop or share the main process GIL.
     """
 
-    def __init__(self):
-        self._lock = threading.Lock()
+    def __init__(self, safety_interceptor: Optional[Any] = None):
+        self.safety_interceptor = safety_interceptor
         self._step_listeners: List[Callable[[Dict[str, Any]], None]] = []
+        self._active_proc: Optional[subprocess.Popen] = None
+        self._proc_lock = threading.Lock()
 
     def register_step_listener(self, callback: Callable[[Dict[str, Any]], None]) -> None:
-        """Register a callback for AGENT_STEP events."""
-        with self._lock:
-            if callback not in self._step_listeners:
-                self._step_listeners.append(callback)
+        if callback not in self._step_listeners:
+            self._step_listeners.append(callback)
 
-    def _emit_step(
-        self,
-        step: int,
-        thought: str,
-        action: str,
-        status: str = "running",
-        output: str = "",
-        screenshot_b64: str = "",
-    ) -> None:
-        """Broadcast AGENT_STEP event to HUD."""
-        payload = {
-            "step": step,
-            "tier": "vision_gui",
-            "thought": thought,
-            "action": action,
-            "status": status,
-            "screenshot_b64": screenshot_b64,
-            "output": output,
-        }
-        with self._lock:
-            listeners = list(self._step_listeners)
-        for cb in listeners:
+    def _emit_step(self, payload: Dict[str, Any]) -> None:
+        for cb in list(self._step_listeners):
             try:
                 cb(payload)
-            except Exception as e:
-                print(f"[OSAgent] Step listener error: {e}")
+            except Exception:
+                pass
 
-    def abort(self) -> None:
-        """Immediately halt the running state machine."""
-        os_actuator.abort()
-
-    def run_task(self, task_description: str, max_steps: int = 10) -> Dict[str, Any]:
-        """
-        Executes the iterative Observe -> Think -> Act -> Verify autonomous loop.
-        """
-        os_actuator.reset_abort()
-        print(f"\n[OSAgent] Commencing Tier-3 GUI autonomous task: '{task_description}'")
-
-        history: List[str] = []
-
-        for step_num in range(1, max_steps + 1):
-            # Check for kill-switch
-            if os_actuator.is_aborted():
+    def abort_current_task(self) -> bool:
+        with self._proc_lock:
+            if self._active_proc and self._active_proc.poll() is None:
+                try:
+                    self._active_proc.terminate()
+                    self._active_proc.wait(timeout=2.0)
+                except Exception:
+                    try:
+                        self._active_proc.kill()
+                    except Exception:
+                        pass
+                self._active_proc = None
                 self._emit_step(
-                    step=step_num,
-                    thought="Autonomous execution halted by user abort / [ESC] kill-switch.",
-                    action="abort",
-                    status="aborted",
-                    output="Emergency abort triggered.",
+                    {
+                        "tier": "TIER_3_VISION",
+                        "phase": "ABORTED",
+                        "message": "OS Agent subprocess terminated by user abort.",
+                    }
                 )
-                return {"ok": False, "summary": "Task aborted by user, sir.", "steps": step_num}
+                return True
+        return False
 
-            # 1. OBSERVE: Distill active UI controls & capture SoM screenshot
-            elements = ui_distiller.get_interactive_elements(max_elements=30)
-            img, screenshot_b64 = som_vision.capture_and_annotate(elements)
-
-            elements_summary = [
-                f"[{el['id']}] {el['type']} '{el['name']}' at ({el['center'][0]}, {el['center'][1]})"
-                for el in elements[:15]
-            ]
-            elements_text = "\n".join(elements_summary)
-
-            self._emit_step(
-                step=step_num,
-                thought=f"Observing screen (Step {step_num}/{max_steps}). Found {len(elements)} interactive elements.",
-                action="observe",
-                status="running",
-                screenshot_b64=screenshot_b64,
+    def execute_goal(self, goal: str, max_steps: int = 8) -> Dict[str, Any]:
+        if self.safety_interceptor is not None:
+            approved, reason = self.safety_interceptor.check_and_request_approval(
+                tier="TIER_3_VISION", command_desc=goal
             )
+            if not approved:
+                msg = f"Action blocked by Safety Interceptor: {reason}"
+                self._emit_step({"tier": "TIER_3_VISION", "phase": "BLOCKED", "message": msg})
+                return {"status": "blocked", "summary": msg}
 
-            # 2. THINK: Vision LLM reasons over SoM screenshot and element coordinates
-            system_prompt = (
-                "You are JARVIS Tier-3 OS Vision Agent operating desktop applications visually like a human.\n"
-                "You receive an image of the desktop screen with numbered Set-of-Mark cyan boxes [ID] and a list of elements.\n"
-                "Return a JSON object in this exact schema:\n"
-                "{\n"
-                '  "thought": "<brief analysis of the active window and what to do next>",\n'
-                '  "action": "click" | "double_click" | "type" | "hotkey" | "scroll" | "done",\n'
-                '  "target_id": <int or null>,\n'
-                '  "x": <int or null>,\n'
-                '  "y": <int or null>,\n'
-                '  "text": <string or null>,\n'
-                '  "keys": <string or null>,\n'
-                '  "done": <boolean>\n'
-                "}\n"
+        self.abort_current_task()
+
+        cmd = [sys.executable, "-m", "agent_os.worker_proc"]
+        final_result: Dict[str, Any] = {"status": "completed", "summary": "OS Agent task finished."}
+
+        with self._proc_lock:
+            self._active_proc = subprocess.Popen(
+                cmd,
+                cwd=str(BASE_DIR),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                bufsize=1,
             )
+            proc = self._active_proc
 
-            user_prompt = (
-                f"Goal: {task_description}\n"
-                f"Current Step: {step_num} of {max_steps}\n"
-                f"Previous steps: {'; '.join(history[-3:]) if history else 'None'}\n"
-                f"Visible UI Elements:\n{elements_text}\n"
-                "Analyze the screen and output your next action JSON."
-            )
+        try:
+            assert proc.stdin is not None
+            assert proc.stdout is not None
+            proc.stdin.write(json.dumps({"goal": goal, "max_steps": max_steps}) + "\n")
+            proc.stdin.flush()
+            proc.stdin.close()
 
-            messages = [
-                ChatMessage(role="system", content=system_prompt),
-                ChatMessage(role="user", content=user_prompt, image_b64=screenshot_b64),
-            ]
+            for raw_line in proc.stdout:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                except Exception:
+                    continue
 
-            resp = router.dispatch_role("vision_agent", messages, json_mode=True)
-            plan = resp.raw_json or {}
+                ev = msg.get("event")
+                payload = msg.get("payload", {})
+                if ev == "AGENT_STEP":
+                    self._emit_step(payload)
+                elif ev == "RESULT":
+                    final_result = payload
 
-            thought = plan.get("thought", f"Proceeding with step {step_num}")
-            action_name = plan.get("action", "click")
-            is_done = bool(plan.get("done", False))
+            proc.wait(timeout=5.0)
+        except Exception as exc:
+            final_result = {"status": "error", "summary": f"OS Agent supervisor error: {exc}"}
+        finally:
+            with self._proc_lock:
+                if self._active_proc is proc:
+                    self._active_proc = None
 
-            history.append(f"Step {step_num}: {thought} -> {action_name}")
-
-            # Check abort before acting
-            if os_actuator.is_aborted():
-                self._emit_step(
-                    step=step_num,
-                    thought="Execution aborted by user.",
-                    action="abort",
-                    status="aborted",
-                    screenshot_b64=screenshot_b64,
-                )
-                return {"ok": False, "summary": "Task aborted by user, sir.", "steps": step_num}
-
-            # 3. ACT: Execute the planned action
-            act_output = ""
-            target_id = plan.get("target_id")
-            x = plan.get("x")
-            y = plan.get("y")
-
-            # Resolve coordinates from target_id if not explicitly provided
-            if target_id is not None and (x is None or y is None):
-                for el in elements:
-                    if el.get("id") == target_id:
-                        x, y = el["center"][0], el["center"][1]
-                        break
-
-            if action_name == "click" and x is not None and y is not None:
-                os_actuator.click(x, y)
-                act_output = f"Clicked at ({x}, {y})"
-            elif action_name == "double_click" and x is not None and y is not None:
-                os_actuator.double_click(x, y)
-                act_output = f"Double-clicked at ({x}, {y})"
-            elif action_name == "type" and plan.get("text"):
-                if x is not None and y is not None:
-                    os_actuator.click(x, y)
-                    time.sleep(0.1)
-                text_to_type = plan.get("text", "")
-                os_actuator.type_text(text_to_type)
-                act_output = f"Typed: '{text_to_type}'"
-            elif action_name == "hotkey" and plan.get("keys"):
-                hotkey_str = plan.get("keys", "")
-                os_actuator.press_hotkey(hotkey_str)
-                act_output = f"Pressed hotkey: {hotkey_str}"
-            elif action_name == "scroll":
-                amount = int(plan.get("y", -300) or -300)
-                os_actuator.scroll(amount)
-                act_output = f"Scrolled {amount}"
-            elif is_done or action_name == "done":
-                self._emit_step(
-                    step=step_num,
-                    thought=thought,
-                    action="finish",
-                    status="done",
-                    output="Task successfully completed.",
-                    screenshot_b64=screenshot_b64,
-                )
-                return {
-                    "ok": True,
-                    "summary": thought or "Task completed successfully, sir.",
-                    "steps": step_num,
-                }
-
-            self._emit_step(
-                step=step_num,
-                thought=thought,
-                action=action_name,
-                status="running",
-                output=act_output,
-                screenshot_b64=screenshot_b64,
-            )
-
-            # 4. VERIFY: Pause briefly for GUI response
-            time.sleep(0.6)
-
-        return {
-            "ok": True,
-            "summary": f"Completed {max_steps} visual automation steps for: '{task_description}'",
-            "steps": max_steps,
-        }
-
-
-# Global OS agent state machine singleton
-os_agent = OSAgentStateMachine()
+        return final_result

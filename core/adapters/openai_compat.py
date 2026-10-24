@@ -10,7 +10,7 @@ import time
 from typing import Any, Dict, List, Optional
 import requests
 
-from .base import BaseLLMAdapter, ChatMessage, LLMResponse
+from .base import BaseLLMAdapter, ChatMessage, LLMResponse, extract_json_from_text
 
 
 def fetch_models(base_url: str, api_key: str = "") -> List[str]:
@@ -105,6 +105,36 @@ class OpenAICompatAdapter(BaseLLMAdapter):
 
         try:
             resp = requests.post(endpoint_url, headers=headers, json=body, timeout=45)
+
+            # If json_mode=True and request returns HTTP != 200 or empty choices,
+            # immediately retry the request without response_format!
+            if json_mode:
+                need_retry = False
+                if resp.status_code != 200:
+                    need_retry = True
+                else:
+                    try:
+                        d = resp.json()
+                        c = d.get("choices", [])
+                        if not c or not c[0].get("message", {}).get("content"):
+                            need_retry = True
+                    except Exception:
+                        need_retry = True
+
+                if need_retry:
+                    retry_body = {
+                        "model": self.model,
+                        "messages": formatted_messages,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                    }
+                    try:
+                        retry_resp = requests.post(endpoint_url, headers=headers, json=retry_body, timeout=45)
+                        if retry_resp.status_code == 200:
+                            resp = retry_resp
+                    except Exception:
+                        pass
+
             latency_ms = int((time.time() - start_time) * 1000)
 
             if resp.status_code != 200:
@@ -127,12 +157,8 @@ class OpenAICompatAdapter(BaseLLMAdapter):
             prompt_tokens = usage.get("prompt_tokens", 0) if usage else 0
             completion_tokens = usage.get("completion_tokens", 0) if usage else 0
 
-            raw_json = None
-            if json_mode and text_out:
-                try:
-                    raw_json = json.loads(text_out)
-                except Exception:
-                    pass
+            # Always use extract_json_from_text(text_out) to populate raw_json
+            raw_json = extract_json_from_text(text_out) if text_out else None
 
             return LLMResponse(
                 text=text_out,

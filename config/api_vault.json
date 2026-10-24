@@ -63,11 +63,11 @@
     },
     "custom_endpoints": [
       {
-        "id": "custom-1792521259862",
-        "name": "free llms",
+        "id": "custom-1792682413669",
+        "name": "free jarvis",
         "base_url": "http://127.0.0.1:31415/v1",
         "api_key": "freellmapi-dc45c78fe6033a2efb4e3ae1cb7ecbadf4eb082297adaf79",
-        "model": "auto"
+        "model": "auto:jarvis"
       }
     ],
     "openweathermap": {
