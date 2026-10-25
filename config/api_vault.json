@@ -26,22 +26,35 @@
       "models": [
         "gemini-2.5-flash",
         "gemini-2.5-pro"
-      ]
+      ],
+      "default_model": "gemini-2.5-flash"
     },
     "groq": {
-      "keys": [],
+      "keys": [
+        {
+          "id": "groq_1_73558",
+          "label": "GROQ Key #1",
+          "key": "sk_live_integration_test_secret_9999",
+          "status": "active",
+          "calls": 0,
+          "errors": 0,
+          "last_error": null
+        }
+      ],
       "active_index": 0,
       "models": [
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant"
-      ]
+      ],
+      "default_model": "llama-3.3-70b-versatile"
     },
     "anthropic": {
       "keys": [],
       "active_index": 0,
       "models": [
         "claude-3-5-sonnet-latest"
-      ]
+      ],
+      "default_model": "claude-3-5-sonnet-latest"
     },
     "openrouter": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -68,14 +81,80 @@
         "base_url": "http://127.0.0.1:31415/v1",
         "api_key": "freellmapi-dc45c78fe6033a2efb4e3ae1cb7ecbadf4eb082297adaf79",
         "model": "auto:jarvis"
+      },
+      {
+        "id": "custom-1792888783162",
+        "name": "free llms",
+        "base_url": "http://127.0.0.1:31415/v1",
+        "api_key": "freellmapi-dc45c78fe6033a2efb4e3ae1cb7ecbadf4eb082297adaf79",
+        "model": "auto"
       }
     ],
     "openweathermap": {
       "keys": [],
       "keys_masked": []
+    },
+    "openai": {
+      "keys": [],
+      "active_index": 0,
+      "default_model": "gpt-4o-mini",
+      "models": [
+        "gpt-4o-mini",
+        "gpt-4o"
+      ]
     }
   },
   "services": {
     "openweathermap": ""
+  },
+  "custom_endpoints": [
+    {
+      "id": "freellmapi_local",
+      "name": "FREELLMAPI Local Server",
+      "base_url": "http://127.0.0.1:8000/v1",
+      "api_key": "sk-local-free",
+      "default_model": "default",
+      "model": "default",
+      "enabled": true,
+      "min_request_interval_ms": 65
+    }
+  ],
+  "role_mappings": {
+    "chat": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    },
+    "router": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    },
+    "coding": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    },
+    "code_synth": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    },
+    "vision": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    },
+    "vision_agent": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    },
+    "summarizer": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    },
+    "meeting_summarizer": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash"
+    }
+  },
+  "safety": {
+    "require_approval_for_high_risk": true,
+    "auto_approve_safe": true
   }
 }
