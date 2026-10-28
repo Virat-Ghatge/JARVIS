@@ -1,69 +1,109 @@
-#!/usr/bin/env python3
-"""
-Conversation Memory & Context Window Manager for JARVIS 2.0
-Maintains conversation history, trims context windows, and formats messages for adapters.
-"""
-
-from datetime import datetime
+import time
 import threading
-from typing import List, Optional
-from core.adapters.base import ChatMessage
+from datetime import datetime
+from typing import List, Dict, Any, Optional
 
 
 class ContextManager:
-    """Manages short-term conversation context for multi-turn dialogues."""
+    """
+    Multi-turn conversation memory manager with real-time 2026 clock & date
+    system prompt injection to prevent LLM temporal hallucinations.
+    """
 
-    def __init__(self, max_turns: int = 20):
+    def __init__(
+        self,
+        max_turns: int = 12,
+        max_messages: int = 24,
+        system_prompt: Optional[str] = None,
+    ):
         self.max_turns = max_turns
-        self._history: List[ChatMessage] = []
-        self._system_prompt: Optional[str] = (
-            "You are J.A.R.V.I.S., an advanced AI assistant and operating system companion. "
-            "Respond concisely, politely, and precisely. Always prioritize actionable solutions."
+        self.max_messages = max_messages or (max_turns * 2)
+        self._custom_system_prompt = system_prompt
+        self.history: List[Dict[str, Any]] = []
+        self._lock = threading.RLock()
+
+    def get_system_prompt(self, extra_context: Optional[str] = None) -> str:
+        now = datetime.now()
+        current_dt_str = now.strftime("%A, %B %d, %Y at %I:%M %p")
+        current_year = now.year
+
+        base = self._custom_system_prompt or (
+            "You are JARVIS 2.0, a highly capable, articulate, and responsive desktop AI assistant. "
+            "Provide direct, accurate, and well-structured answers. "
+            "When writing code, provide complete, runnable implementations."
         )
-        self._lock = threading.Lock()
+        temporal_anchor = (
+            f"\n[REAL-TIME SYSTEM CLOCK]: Current Date & Time is {current_dt_str} (Year: {current_year}). "
+            f"Never assume the year is 2024; always use {current_year} for current events and schedules."
+        )
+        full_prompt = f"{base}{temporal_anchor}"
+        if extra_context:
+            full_prompt += f"\n\n{extra_context}"
+        return full_prompt
 
-    def set_system_prompt(self, prompt: str) -> None:
-        """Update global system instructions."""
+    def add_message(self, role: str, content: str, **meta: Any) -> Dict[str, Any]:
+        norm_role = "assistant" if role in ("assistant", "model", "jarvis", "bot") else (
+            "system" if role == "system" else "user"
+        )
+        entry: Dict[str, Any] = {
+            "role": norm_role,
+            "content": str(content),
+            "timestamp": datetime.now().isoformat(),
+        }
+        if meta:
+            entry.update(meta)
         with self._lock:
-            self._system_prompt = prompt
+            self.history.append(entry)
+            if len(self.history) > self.max_messages:
+                self.history = self.history[-self.max_messages:]
+        return entry
 
-    def add_user_message(self, text: str, image_b64: Optional[str] = None) -> None:
-        """Append user query to history."""
-        with self._lock:
-            self._history.append(ChatMessage(role="user", content=text, image_b64=image_b64))
-            self._trim()
+    def add_user_message(self, content: str) -> Dict[str, Any]:
+        return self.add_message("user", content)
 
-    def add_assistant_message(self, text: str) -> None:
-        """Append assistant response to history."""
-        with self._lock:
-            self._history.append(ChatMessage(role="assistant", content=text))
-            self._trim()
+    def add_assistant_message(self, content: str) -> Dict[str, Any]:
+        return self.add_message("assistant", content)
 
-    def get_messages(self) -> List[ChatMessage]:
-        """Return full message list including system instruction."""
+    def add_turn(self, user_input: str, assistant_reply: str) -> None:
+        self.add_message("user", user_input)
+        self.add_message("assistant", assistant_reply)
+
+    def get_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         with self._lock:
-            messages = []
-            if self._system_prompt:
-                now_dt = datetime.now()
-                dynamic_sys = (
-                    f"{self._system_prompt}\n"
-                    f"Current System Date & Time: {now_dt.strftime('%A, %B %d, %Y at %I:%M %p')} (Current Year: {now_dt.year}).\n"
-                    "CRITICAL RULE: Never say 'Let me check that for you' or 'I can help with that' without actually providing the full answer in the same message."
-                )
-                messages.append(ChatMessage(role="system", content=dynamic_sys))
-            messages.extend(list(self._history))
-            return messages
+            items = list(self.history)
+        if limit is not None and limit > 0:
+            return items[-limit:]
+        return items
+
+    def get_messages(self, include_system: bool = False, extra_context: Optional[str] = None) -> List[Dict[str, str]]:
+        with self._lock:
+            msgs = [{"role": m["role"], "content": str(m["content"])} for m in self.history]
+        if include_system:
+            return [{"role": "system", "content": self.get_system_prompt(extra_context=extra_context)}] + msgs
+        return msgs
+
+    def get_context(self) -> List[Dict[str, str]]:
+        return self.get_messages(include_system=True)
+
+    def build_messages(
+        self,
+        user_input: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+    ) -> List[Dict[str, str]]:
+        sys_content = system_prompt or self.get_system_prompt()
+        if user_input:
+            self.add_user_message(user_input)
+        with self._lock:
+            msgs = [{"role": m["role"], "content": str(m["content"])} for m in self.history]
+        return [{"role": "system", "content": sys_content}] + msgs
 
     def clear(self) -> None:
-        """Reset conversation memory."""
         with self._lock:
-            self._history.clear()
+            self.history.clear()
 
-    def _trim(self) -> None:
-        """Trim messages exceeding max_turns while preserving pairs."""
-        if len(self._history) > self.max_turns * 2:
-            self._history = self._history[-(self.max_turns * 2):]
+    def reset(self) -> None:
+        self.clear()
 
 
-# Singleton instance
-context_mgr = ContextManager()
+# Module-level singleton export
+context_manager = ContextManager()

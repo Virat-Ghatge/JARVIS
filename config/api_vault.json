@@ -33,12 +33,19 @@
       "keys": [
         {
           "id": "groq_1_73558",
+          "index": 0,
           "label": "GROQ Key #1",
           "key": "sk_live_integration_test_secret_9999",
+          "value": "sk_live_integration_test_secret_9999",
+          "masked": "sk_l...9999",
+          "masked_key": "sk_l...9999",
+          "preview": "sk_l...9999",
           "status": "active",
+          "is_active": true,
           "calls": 0,
           "errors": 0,
-          "last_error": null
+          "last_error": null,
+          "added_at": "2026-10-25 06:38:56"
         }
       ],
       "active_index": 0,
@@ -116,7 +123,9 @@
       "default_model": "default",
       "model": "default",
       "enabled": true,
-      "min_request_interval_ms": 65
+      "min_request_interval_ms": 65,
+      "url": "http://127.0.0.1:8000/v1",
+      "masked_key": "sk-l...free"
     }
   ],
   "role_mappings": {

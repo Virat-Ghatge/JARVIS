@@ -38,7 +38,6 @@ def wait_for_server_ready(host: str, port: int, max_wait_sec: float = 15.0) -> b
 
 
 def find_chromium_binary() -> Optional[str]:
-    """Locates Chrome or Edge executable to run JARVIS HUD in isolated `--app` mode."""
     candidates: List[str] = []
     if sys.platform.startswith("win"):
         prog_files = [
@@ -68,10 +67,6 @@ def find_chromium_binary() -> Optional[str]:
 
 
 def launch_hud_app_window(url: str) -> Optional[subprocess.Popen]:
-    """
-    Launches the JARVIS HUD in Chromium's multi-process `--app` mode so UI rendering
-    never shares a process or GIL with Python/FastAPI.
-    """
     browser_bin = find_chromium_binary()
     hud_profile_dir = BASE_DIR / ".hud_app_profile"
     hud_profile_dir.mkdir(parents=True, exist_ok=True)
@@ -85,6 +80,7 @@ def launch_hud_app_window(url: str) -> Optional[subprocess.Popen]:
             "--disable-features=Translate",
             "--no-first-run",
             "--no-default-browser-check",
+            "--disk-cache-size=1",
         ]
         try:
             return subprocess.Popen(
@@ -99,14 +95,27 @@ def launch_hud_app_window(url: str) -> Optional[subprocess.Popen]:
     return None
 
 
-def ensure_frontend_built() -> None:
-    if UI_DIST_INDEX.exists():
+def _is_ui_build_stale() -> bool:
+    if not UI_DIST_INDEX.exists():
+        return True
+    dist_mtime = UI_DIST_INDEX.stat().st_mtime
+    src_dir = BASE_DIR / "ui" / "src"
+    if not src_dir.exists():
+        return False
+    for f in src_dir.rglob("*"):
+        if f.is_file() and f.stat().st_mtime > dist_mtime:
+            return True
+    return False
+
+
+def ensure_frontend_built(force: bool = False) -> None:
+    if not force and not _is_ui_build_stale():
         return
     ui_dir = BASE_DIR / "ui"
     if (ui_dir / "package.json").exists():
         npm_cmd = "npm.cmd" if sys.platform.startswith("win") else "npm"
         if shutil.which(npm_cmd):
-            print("[JARVIS Supervisor] ui/dist missing; building React HUD via npm run build...")
+            print("[JARVIS Supervisor] Building React HUD (npm run build)...")
             subprocess.run([npm_cmd, "run", "build"], cwd=str(ui_dir), check=False)
 
 
@@ -128,7 +137,7 @@ def run_backend_server() -> subprocess.Popen:
 
 def main() -> None:
     init_config_files()
-    ensure_frontend_built()
+    ensure_frontend_built(force="--rebuild-ui" in sys.argv)
 
     if "--server-only" in sys.argv:
         uvicorn.run("automation.server:app", host=HOST, port=PORT, log_level="info")

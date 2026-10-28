@@ -1,58 +1,13 @@
-# Environment variables
-.env
-
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
+.env
+.venv/
 venv/
 env/
-ENV/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Logs
-*.log
-
-
-# testing scripts
-test_weather.py
-
-
-# Meeting Bot - persistent browser profile (contains login cookies)
-.browser_profile/
-
-# Meeting schedule data (user-specific)
-config/meetings.json
-
-# Node & Frontend Build
 node_modules/
-ui/node_modules/
-ui/dist/
-*.repomix.txt
-jarvis-repomix.txt
-
+.browser_profile/
+.hud_app_profile/
+*.bundle
+*.log
+.DS_Store

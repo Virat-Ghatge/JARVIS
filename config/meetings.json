@@ -1,0 +1,42 @@
+[
+  {
+    "id": "c8dd80f6",
+    "title": "ml",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/meet/346269858796231?p=ouzAhf5OzT2CVvQnCG",
+    "start_time": "2026-10-22T15:30:00",
+    "end_time": "2026-10-22T16:30:00",
+    "auto_leave": true,
+    "status": "completed"
+  },
+  {
+    "id": "5d086961",
+    "title": "cn",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/meet/3220552006227025?p=IK2NoqQgXIFByfNvko",
+    "start_time": "2026-10-22T14:00:00",
+    "end_time": "2026-10-22T15:00:00",
+    "auto_leave": true,
+    "status": "completed"
+  },
+  {
+    "id": "3f7fb06d",
+    "title": "special cn",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/meet/3561870065249808?p=OxcHpdCw7broIHtWtn",
+    "start_time": "2026-10-22T14:00:00",
+    "end_time": "2026-10-22T15:00:00",
+    "auto_leave": true,
+    "status": "completed"
+  },
+  {
+    "id": "e5290eff",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "completed"
+  }
+]

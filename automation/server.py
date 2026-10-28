@@ -1,59 +1,58 @@
-#!/usr/bin/env python3
-"""
-FastAPI REST & WebSocket Server (:5050) for JARVIS 2.0
-Serves the Holographic HUD React frontend and provides real-time bi-directional
-telemetry and command streaming over WebSockets.
-"""
-
-import asyncio
-import json
 import os
-import subprocess
-import sys
-import threading
 import time
-from datetime import datetime
+import json
+import asyncio
+import threading
+import psutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from typing import Dict, Any, List, Optional, Set
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from fastapi.responses import FileResponse, JSONResponse
 
-# Internal JARVIS modules
 from config.settings import (
-    BASE_DIR,
-    MEETINGS_FILE,
-    ALARMS_FILE,
-    SKILLS_FILE,
-    MCP_SERVERS_FILE,
     UI_DIST_DIR,
-    add_provider_key,
-    get_active_key,
-    get_masked_vault,
-    get_vault,
-    is_internet_connected,
+    init_config_files,
     load_vault,
-    remove_provider_key,
     save_vault,
+    get_masked_vault,
+    add_provider_key,
+    remove_provider_key,
+    set_active_key_index,
+    add_custom_endpoint,
+    remove_custom_endpoint,
+    set_role_target,
+    update_role_mappings,
+    is_internet_connected,
 )
-from core.adapters.openai_compat import fetch_models
-from core.engine import engine
 from core.llm_router import router
-from agent_os.code_executor import code_executor
-from agent_os.os_actuator import os_actuator
-from agent_os.safety_interceptor import safety_interceptor
+from core.engine import engine
+from core.context_manager import context_manager
+from audio.voice_listener import voice_listener
+import audio.tts_engine as tts_mod
+import agent_os.code_executor as ce_mod
 from agent_os.state_machine import os_agent
-from integrations.mcp_client import mcp_client
-from integrations.skill_store import skill_store
-from integrations.workspace_rag import workspace_rag
-from automation.meeting_bot import MeetingBot
+import agent_os.safety_interceptor as si_mod
+import integrations.skill_store as ss_mod
+import integrations.mcp_client as mcp_mod
+from integrations.handlers import alarm as alarm_handler
+from automation.meeting_bot import meeting_bot
+import automation.meeting_scheduler as ms_mod
+import automation.meeting_handler as mh_mod
+
+tts_engine = getattr(tts_mod, "tts_engine", None) or getattr(tts_mod, "TTSEngine", lambda: None)()
+code_executor = getattr(ce_mod, "code_executor", None) or getattr(ce_mod, "CodeExecutor", lambda: None)()
+safety_interceptor = getattr(si_mod, "safety_interceptor", None) or getattr(si_mod, "SafetyInterceptor", lambda: None)()
+skill_store = getattr(ss_mod, "skill_store", None) or getattr(ss_mod, "SkillStore", lambda: None)()
+mcp_client = getattr(mcp_mod, "mcp_client", None) or getattr(mcp_mod, "MCPClient", lambda: None)()
+meeting_scheduler = getattr(ms_mod, "meeting_scheduler", None) or getattr(ms_mod, "MeetingScheduler", lambda: None)()
+meeting_handler = getattr(mh_mod, "meeting_handler", None) or getattr(mh_mod, "MeetingHandler", lambda: None)()
+
+init_config_files()
 
 app = FastAPI(title="JARVIS 2.0 Holographic HUD Server", version="2.0.0")
 
-# Enable CORS for local Vite dev and pywebview
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -62,575 +61,561 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Active WebSocket Connections Pool
-connected_clients: List[WebSocket] = []
-clients_lock = threading.Lock()
-main_event_loop = None
+
+@app.middleware("http")
+async def disable_static_cache(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
 
 
-def broadcast_ws_sync(event_type: str, payload: Dict[str, Any]) -> None:
-    """Thread-safe synchronous helper to broadcast to WebSocket clients."""
-    global main_event_loop
-    message = json.dumps({"type": event_type, "payload": payload})
-    with clients_lock:
-        clients = list(connected_clients)
+# WebSocket Connection Manager
+_ws_clients: Set[WebSocket] = set()
+_main_loop: Optional[asyncio.AbstractEventLoop] = None
 
-    if not clients or not main_event_loop or main_event_loop.is_closed():
+
+async def broadcast_ws(event_type: str, payload: Any) -> None:
+    if not _ws_clients:
         return
-
-    for ws in clients:
+    message = json.dumps({"type": event_type, "event": event_type, "data": payload, "payload": payload})
+    dead: List[WebSocket] = []
+    for ws in list(_ws_clients):
         try:
-            asyncio.run_coroutine_threadsafe(ws.send_text(message), main_event_loop)
+            await ws.send_text(message)
         except Exception:
-            pass
+            dead.append(ws)
+    for ws in dead:
+        _ws_clients.discard(ws)
 
 
-# ── Wire System & Agent Listeners to WebSocket Broadcasts ────────────
-router.register_telemetry_listener(lambda data: broadcast_ws_sync("TOKEN_TELEMETRY", data))
-engine.register_chat_listener(lambda data: broadcast_ws_sync("CHAT_MESSAGE", data))
-code_executor.register_step_listener(lambda data: broadcast_ws_sync("AGENT_STEP", data))
-os_agent.register_step_listener(lambda data: broadcast_ws_sync("AGENT_STEP", data))
-safety_interceptor.register_approval_listener(lambda data: broadcast_ws_sync("APPROVAL_REQUIRED", data))
+def broadcast_ws_sync(event_type: str, payload: Any) -> None:
+    global _main_loop
+    if _main_loop and _main_loop.is_running():
+        asyncio.run_coroutine_threadsafe(broadcast_ws(event_type, payload), _main_loop)
 
 
-# ── WebSocket Endpoint ────────────────────────────────────────────────
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    global main_event_loop
-    main_event_loop = asyncio.get_running_loop()
-    await websocket.accept()
-
-    with clients_lock:
-        connected_clients.append(websocket)
-    print(f"[WebSocket] HUD client connected (Total: {len(connected_clients)})")
-
-    # Send initial states immediately
-    try:
-        await websocket.send_text(json.dumps({
-            "type": "AUDIO_STATE",
-            "payload": {
-                "mic_active": engine.get_mic_active(),
-                "tts_active": engine.get_tts_active(),
-                "status": "idle",
-                "meeting_auto_muted": getattr(engine.listener, "meeting_auto_muted", False),
-            }
-        }))
-    except Exception:
-        pass
-
-    try:
-        while True:
-            data = await websocket.receive_text()
-            try:
-                msg = json.loads(data)
-                mtype = msg.get("type", "")
-                mpayload = msg.get("payload", {})
-
-                if mtype == "USER_COMMAND":
-                    q = mpayload.get("query", "")
-                    src = mpayload.get("source", "text")
-                    threading.Thread(target=engine.process_command, args=(q, src), daemon=True).start()
-            except Exception as parse_err:
-                print(f"[WebSocket] Inbound parse error: {parse_err}")
-
-    except WebSocketDisconnect:
-        with clients_lock:
-            if websocket in connected_clients:
-                connected_clients.remove(websocket)
-        print(f"[WebSocket] HUD client disconnected (Remaining: {len(connected_clients)})")
-
-
-# ── Background Telemetry Broadcast Loop ───────────────────────────────
-async def telemetry_broadcast_worker():
-    """Periodically broadcasts SYSTEM_TELEMETRY and AUDIO_STATE every 2 seconds."""
-    while True:
-        try:
-            import psutil
-            cpu = psutil.cpu_percent(interval=None)
-            ram = psutil.virtual_memory().percent
-            batt = psutil.sensors_battery()
-            battery_pct = int(batt.percent) if batt else 100
-            charging = batt.power_plugged if batt else True
-            online = is_internet_connected()
-
-            broadcast_ws_sync("SYSTEM_TELEMETRY", {
-                "cpu": cpu,
-                "ram": ram,
-                "battery": battery_pct,
-                "charging": charging,
-                "online": online,
-            })
-
-            broadcast_ws_sync("AUDIO_STATE", {
-                "mic_active": engine.get_mic_active(),
-                "tts_active": engine.get_tts_active(),
-                "status": "thinking" if getattr(engine, "is_thinking", False) else ("speaking" if engine.tts.is_speaking() else ("listening" if engine.get_mic_active() else "idle")),
-                "meeting_auto_muted": getattr(engine.listener, "meeting_auto_muted", False),
-            })
-
-            bot = getattr(engine, "meeting_handler", None) and engine.meeting_handler.bot
-            broadcast_ws_sync("MEETING_STATE", {
-                "current_meeting": bot.current_meeting if bot else None,
-                "captions": bot.get_live_captions() if bot else [],
-            })
-        except Exception:
-            pass
-
-        await asyncio.sleep(2.0)
+# Wire Subsystem Event Listeners to WebSocket Broadcast
+router.register_telemetry_listener(lambda d: broadcast_ws_sync("TOKEN_TELEMETRY", d))
+engine.register_chat_listener(lambda d: broadcast_ws_sync("CHAT_MESSAGE", d))
+if code_executor and hasattr(code_executor, "register_step_listener"):
+    code_executor.register_step_listener(lambda d: broadcast_ws_sync("AGENT_STEP", d))
+os_agent.register_step_listener(lambda d: broadcast_ws_sync("AGENT_STEP", d))
+if safety_interceptor and hasattr(safety_interceptor, "register_approval_listener"):
+    safety_interceptor.register_approval_listener(lambda d: broadcast_ws_sync("APPROVAL_REQUIRED", d))
+meeting_bot.register_state_listener(lambda d: broadcast_ws_sync("MEETING_STATE", d))
+voice_listener.register_state_listener(
+    lambda d: broadcast_ws_sync(
+        "AUDIO_STATE",
+        {
+            **d,
+            "tts_active": getattr(tts_engine, "tts_active", True),
+        },
+    )
+)
 
 
 @app.on_event("startup")
-async def startup_event():
-    global main_event_loop
-    main_event_loop = asyncio.get_running_loop()
-    asyncio.create_task(telemetry_broadcast_worker())
+async def on_startup():
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
+    voice_listener.set_callback(lambda text: engine.process_command(text, source="voice"))
+
+    async def _telemetry_loop():
+        while True:
+            try:
+                cpu = psutil.cpu_percent(interval=None)
+                mem = psutil.virtual_memory().percent
+                batt = psutil.sensors_battery()
+                await broadcast_ws(
+                    "SYSTEM_TELEMETRY",
+                    {
+                        "cpu": cpu,
+                        "ram": mem,
+                        "memory": mem,
+                        "battery": batt.percent if batt else 100,
+                        "plugged": batt.power_plugged if batt else True,
+                        "online": is_internet_connected(role="chat"),
+                        "mic_active": voice_listener.mic_active,
+                        "tts_active": getattr(tts_engine, "tts_active", True),
+                        "in_meeting": meeting_bot.get_state().get("in_meeting", False),
+                        "token_stats": router.get_telemetry(),
+                    },
+                )
+            except Exception:
+                pass
+            await asyncio.sleep(2.5)
+
+    asyncio.create_task(_telemetry_loop())
 
 
-# ── Pydantic Request Models ───────────────────────────────────────────
-class CommandRequest(BaseModel):
-    query: str
-    source: str = "text"
-
-class AudioToggleRequest(BaseModel):
-    target: str  # "mic" or "tts"
-    enabled: bool
-
-class KeyRequest(BaseModel):
-    provider: str
-    key: Optional[str] = ""
-    key_index: Optional[int] = None
-    action: str = "add"  # "add" or "remove"
-
-class JoinMeetingRequest(BaseModel):
-    url: str
-    title: Optional[str] = "Online Meeting"
-
-class TeachStartRequest(BaseModel):
-    name: str
-    trigger_phrases: List[str] = []
-
-class TeachStopRequest(BaseModel):
-    save: bool = True
-
-class CustomEndpointRequest(BaseModel):
-    action: str = "add"  # "add" or "delete"
-    endpoint: Optional[Dict[str, Any]] = None
-    endpoint_id: Optional[str] = None
-
-class FetchModelsRequest(BaseModel):
-    base_url: str
-    api_key: Optional[str] = ""
-
-class TestConnectionRequest(BaseModel):
-    provider: str
-    base_url: Optional[str] = None
-    api_key: Optional[str] = None
-    model: Optional[str] = None
-
-class RolesRequest(BaseModel):
-    roles: Optional[Dict[str, Any]] = None
-    autonomous_trust_mode: Optional[bool] = None
-    workspace_path: Optional[str] = None
-
-class ApprovalRequest(BaseModel):
-    approved: bool
-
-class SystemControlRequest(BaseModel):
-    action: str  # "volume", "brightness", "app", "workspace_path"
-    value: Any
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    _ws_clients.add(websocket)
+    try:
+        await websocket.send_text(
+            json.dumps({
+                "type": "AUDIO_STATE",
+                "data": {
+                    **voice_listener.get_state(),
+                    "tts_active": getattr(tts_engine, "tts_active", True),
+                },
+            })
+        )
+        await websocket.send_text(
+            json.dumps({"type": "MEETING_STATE", "data": meeting_bot.get_state()})
+        )
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                msg = json.loads(raw)
+                if msg.get("type") == "COMMAND" and msg.get("command"):
+                    await asyncio.to_thread(engine.process_command, str(msg["command"]), "ws")
+            except Exception:
+                pass
+    except WebSocketDisconnect:
+        _ws_clients.discard(websocket)
+    except Exception:
+        _ws_clients.discard(websocket)
 
 
-# ── REST API Endpoints ────────────────────────────────────────────────
-@app.post("/api/command")
-def api_command(req: CommandRequest):
-    res = engine.process_command(req.query, source=req.source)
-    return res
+# ==================== REST API ROUTES ====================
 
-@app.post("/api/audio/toggle")
-def api_audio_toggle(req: AudioToggleRequest):
-    if req.target == "mic":
-        engine.set_mic_active(req.enabled)
-        state = engine.get_mic_active()
-    elif req.target == "tts":
-        engine.set_tts_active(req.enabled)
-        state = engine.get_tts_active()
-    else:
-        raise HTTPException(status_code=400, detail="Invalid audio target")
-    return {"target": req.target, "enabled": state}
-
-@app.get("/api/vault")
-def api_get_vault(reveal: bool = False):
-    if reveal:
-        return load_vault()
-    return get_masked_vault()
-
-@app.post("/api/vault/key")
-def api_vault_key(req: KeyRequest):
-    if req.action == "add":
-        success = add_provider_key(req.provider, req.key or "")
-    elif req.action == "remove":
-        success = remove_provider_key(req.provider, key_or_index=req.key, key_index=req.key_index)
-    else:
-        raise HTTPException(status_code=400, detail="Action must be 'add' or 'remove'")
-    return {"ok": success, "vault": get_masked_vault()}
-
-@app.post("/api/vault/custom-endpoint")
-def api_vault_custom_endpoint(req: CustomEndpointRequest):
-    vault = load_vault()
-    eps = vault.setdefault("providers", {}).setdefault("custom_endpoints", [])
-    if req.action == "add" and req.endpoint:
-        existing = next((i for i, ep in enumerate(eps) if ep.get("id") == req.endpoint.get("id")), None)
-        if existing is not None:
-            eps[existing] = req.endpoint
-        else:
-            eps.append(req.endpoint)
-        save_vault(vault)
-        return {"ok": True, "vault": get_masked_vault()}
-    elif req.action == "delete" and req.endpoint_id:
-        vault["providers"]["custom_endpoints"] = [ep for ep in eps if ep.get("id") != req.endpoint_id]
-        save_vault(vault)
-        return {"ok": True, "vault": get_masked_vault()}
-    raise HTTPException(status_code=400, detail="Invalid custom-endpoint request")
-
-@app.post("/api/vault/fetch-models")
-def api_fetch_models(req: FetchModelsRequest):
-    models = fetch_models(req.base_url, req.api_key or "")
-    return {"ok": True, "models": models}
-
-@app.post("/api/vault/test")
-def api_test_connection(req: TestConnectionRequest):
-    if req.provider == "openweathermap":
-        import time
-        t0 = time.time()
-        old_key = getattr(engine.weather_handler, "_custom_api_key", None)
-        if req.api_key:
-            engine.weather_handler._custom_api_key = req.api_key
-        try:
-            ok = engine.weather_handler.test_api_key()
-            lat = int((time.time() - t0) * 1000)
-            return {"ok": bool(ok), "latency_ms": lat, "error": None if ok else "OpenWeatherMap API key invalid or unreachable"}
-        finally:
-            engine.weather_handler._custom_api_key = old_key
-
-    adapter = router.get_adapter_for_provider(
-        provider=req.provider,
-        model=req.model or "",
-        api_key=req.api_key,
-    )
-    if req.base_url and hasattr(adapter, "base_url"):
-        adapter.base_url = req.base_url.rstrip("/")
-    res = adapter.test_connection()
-    return res
-
-@app.post("/api/vault/roles")
-def api_update_roles(req: RolesRequest):
-    vault = load_vault()
-    if req.roles is not None:
-        vault["roles"] = req.roles
-    if req.autonomous_trust_mode is not None:
-        vault["autonomous_trust_mode"] = req.autonomous_trust_mode
-    if req.workspace_path is not None:
-        vault["workspace_path"] = req.workspace_path
-    save_vault(vault)
-    return {"ok": True, "vault": get_masked_vault()}
-
-@app.get("/api/meetings")
-def api_get_meetings():
-    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
-    bot = getattr(engine, "meeting_handler", None) and engine.meeting_handler.bot
-    meetings_data = scheduler.get_all() if scheduler else []
-    summaries = bot.get_summaries() if bot else []
-    live_caps = bot.get_live_captions() if bot else []
-    curr_mtg = bot.current_meeting if bot else None
+@app.get("/api/health")
+@app.get("/api/status")
+async def get_status():
     return {
-        "meetings": meetings_data,
-        "summaries": summaries,
-        "live_captions": live_caps,
-        "current_meeting": curr_mtg,
+        "status": "online",
+        "online": is_internet_connected(role="chat"),
+        "audio": {
+            **voice_listener.get_state(),
+            "tts_active": getattr(tts_engine, "tts_active", True),
+        },
+        "meeting": meeting_bot.get_state(),
+        "telemetry": router.get_telemetry(),
     }
 
-@app.post("/api/meetings")
-def api_add_meeting(meeting: Dict[str, Any]):
-    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
-    if not scheduler:
-        raise HTTPException(status_code=500, detail="Meeting scheduler not available")
-    st = meeting.get("start_time")
-    if isinstance(st, str):
-        try:
-            st_dt = datetime.fromisoformat(st.replace("Z", "+00:00"))
-        except Exception:
-            st_dt = datetime.now()
-    elif isinstance(st, datetime):
-        st_dt = st
-    else:
-        st_dt = datetime.now()
 
-    # FIX 2: Convert timezone-aware datetimes to local naive time
-    if st_dt.tzinfo is not None:
-        st_dt = st_dt.astimezone().replace(tzinfo=None)
+@app.post("/api/command")
+async def post_command(request: Request):
+    body = await request.json()
+    cmd_text = str(body.get("command") or body.get("text") or body.get("prompt") or "").strip()
+    if not cmd_text:
+        raise HTTPException(status_code=400, detail="Command text is required")
+    res = await asyncio.to_thread(engine.process_command, cmd_text, body.get("source", "hud"))
+    return dict(res)
 
-    et = meeting.get("end_time")
-    et_dt = None
-    if isinstance(et, str):
-        try:
-            et_dt = datetime.fromisoformat(et.replace("Z", "+00:00"))
-        except Exception:
-            et_dt = None
 
-    if et_dt is not None and et_dt.tzinfo is not None:
-        et_dt = et_dt.astimezone().replace(tzinfo=None)
+@app.post("/api/context/clear")
+async def clear_chat_context():
+    context_manager.clear()
+    return {"status": "ok", "message": "Conversation context cleared."}
 
-    new_m = scheduler.add_meeting(
-        title=meeting.get("title", "Meeting"),
-        meeting_url=meeting.get("meeting_url", ""),
-        start_time=st_dt,
-        end_time=et_dt,
-        auto_leave=meeting.get("auto_leave", True),
+
+@app.get("/api/audio/state")
+async def get_audio_state():
+    return {
+        **voice_listener.get_state(),
+        "tts_active": getattr(tts_engine, "tts_active", True),
+    }
+
+
+@app.post("/api/audio/toggle")
+async def toggle_audio(request: Request):
+    body = await request.json()
+    if "mic_active" in body or body.get("target") == "mic":
+        new_mic = body.get("mic_active") if "mic_active" in body else body.get("active")
+        if new_mic is None:
+            voice_listener.toggle_mic()
+        else:
+            voice_listener.set_mic_active(bool(new_mic), manual_override=True)
+
+    if "tts_active" in body or body.get("target") == "tts":
+        new_tts = body.get("tts_active") if "tts_active" in body else body.get("active")
+        if new_tts is None:
+            curr = getattr(tts_engine, "tts_active", True)
+            if hasattr(tts_engine, "set_tts_active"):
+                tts_engine.set_tts_active(not curr)
+            elif tts_engine is not None:
+                tts_engine.tts_active = not curr
+        else:
+            if hasattr(tts_engine, "set_tts_active"):
+                tts_engine.set_tts_active(bool(new_tts))
+            elif tts_engine is not None:
+                tts_engine.tts_active = bool(new_tts)
+
+    state = {
+        **voice_listener.get_state(),
+        "tts_active": getattr(tts_engine, "tts_active", True),
+    }
+    await broadcast_ws("AUDIO_STATE", state)
+    return state
+
+
+# ==================== API KEY VAULT ROUTES ====================
+
+def _format_vault_response() -> Dict[str, Any]:
+    masked = get_masked_vault()
+    return {
+        "status": "ok",
+        **masked,
+        "vault": masked,
+    }
+
+
+@app.get("/api/vault")
+@app.get("/api/vault/keys")
+async def get_vault_endpoint():
+    return _format_vault_response()
+
+
+@app.post("/api/vault/key")
+@app.post("/api/vault/keys")
+async def add_vault_key_endpoint(request: Request):
+    body = await request.json()
+    provider = str(body.get("provider", "gemini")).strip().lower()
+    key = str(body.get("key") or body.get("api_key") or body.get("value") or "").strip()
+    label = str(body.get("label") or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="API key value cannot be empty.")
+    add_provider_key(provider=provider, key=key, label=label)
+    return _format_vault_response()
+
+
+@app.delete("/api/vault/key")
+@app.delete("/api/vault/keys")
+@app.post("/api/vault/key/remove")
+async def delete_vault_key_endpoint(
+    request: Request,
+    provider: Optional[str] = None,
+    index: Optional[int] = None,
+    key_id: Optional[str] = None,
+):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    prov = provider or body.get("provider")
+    target = index if index is not None else (key_id or body.get("index") if body.get("index") is not None else (body.get("id") or body.get("key")))
+    if not prov or target is None:
+        raise HTTPException(status_code=400, detail="Provider and key index/id are required.")
+    remove_provider_key(str(prov), target)
+    return _format_vault_response()
+
+
+@app.delete("/api/vault/key/{provider}/{key_or_index}")
+@app.delete("/api/vault/keys/{provider}/{key_or_index}")
+async def delete_vault_key_path_endpoint(provider: str, key_or_index: str):
+    remove_provider_key(provider, key_or_index)
+    return _format_vault_response()
+
+
+@app.post("/api/vault/key/activate")
+@app.post("/api/vault/active")
+async def set_active_vault_key_endpoint(request: Request):
+    body = await request.json()
+    provider = str(body.get("provider", "gemini")).strip().lower()
+    index = int(body.get("index", 0))
+    set_active_key_index(provider, index)
+    return _format_vault_response()
+
+
+@app.post("/api/vault/endpoint")
+@app.post("/api/vault/endpoints")
+@app.post("/api/vault/custom")
+async def add_custom_endpoint_route(request: Request):
+    body = await request.json()
+    add_custom_endpoint(body)
+    return _format_vault_response()
+
+
+@app.delete("/api/vault/endpoint/{ep_id}")
+@app.delete("/api/vault/endpoints/{ep_id}")
+@app.delete("/api/vault/custom/{ep_id}")
+async def remove_custom_endpoint_route(ep_id: str):
+    remove_custom_endpoint(ep_id)
+    return _format_vault_response()
+
+
+@app.post("/api/vault/role")
+@app.post("/api/vault/roles")
+async def update_vault_roles_route(request: Request):
+    body = await request.json()
+    if "role" in body and "provider" in body:
+        set_role_target(str(body["role"]), body["provider"], model=body.get("model"))
+    elif "role_mappings" in body and isinstance(body["role_mappings"], dict):
+        update_role_mappings(body["role_mappings"])
+    elif isinstance(body, dict):
+        update_role_mappings(body)
+    return _format_vault_response()
+
+
+@app.post("/api/vault/test")
+async def test_vault_llm_route(request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    prov = body.get("provider")
+    model = body.get("model")
+    res = await asyncio.to_thread(
+        router.chat,
+        [{"role": "user", "content": "Respond with: JARVIS_ONLINE"}],
+        "chat",
+        "You are JARVIS. Reply with a short confirmation.",
+        prov,
+        model,
     )
-    return {"ok": True, "meeting": new_m}
+    return {
+        "status": "ok" if res.get("success") else "error",
+        "success": bool(res.get("success")),
+        "reply": res.get("content"),
+        "provider": res.get("provider"),
+        "model": res.get("model"),
+        "latency_ms": res.get("latency_ms", 0),
+        "error": res.get("error"),
+    }
 
-@app.delete("/api/meetings/{meeting_id}")
-def api_delete_meeting(meeting_id: str):
-    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
-    if scheduler:
-        scheduler.cancel_meeting(meeting_id)
-        with scheduler._lock:
-            scheduler._meetings = [m for m in scheduler._meetings if m.get("id") != meeting_id]
-            scheduler._save()
-        return {"ok": True}
-    return {"ok": False}
 
-@app.post("/api/meetings/{meeting_id}/join")
-def api_join_meeting_by_id(meeting_id: str):
-    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
-    bot = getattr(engine, "meeting_handler", None) and engine.meeting_handler.bot
-    if not scheduler:
-        raise HTTPException(status_code=500, detail="Meeting scheduler not available")
-    meeting = scheduler.get_by_id(meeting_id)
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
+# ==================== MEETINGS ROUTES ====================
 
-    # Mark active immediately to avoid race with poller
-    scheduler.mark_active(meeting_id)
-    et = meeting.get("end_time")
-    end_dt = None
-    if isinstance(et, str):
-        try:
-            end_dt = datetime.fromisoformat(et.replace("Z", "+00:00"))
-            if end_dt.tzinfo is not None:
-                end_dt = end_dt.astimezone().replace(tzinfo=None)
-        except Exception:
-            end_dt = None
-    elif isinstance(et, datetime):
-        end_dt = et
+def _list_scheduled_meetings() -> List[Dict[str, Any]]:
+    if meeting_scheduler is None:
+        return []
+    for fn_name in ("list_meetings", "get_meetings", "get_scheduled_meetings"):
+        fn = getattr(meeting_scheduler, fn_name, None)
+        if callable(fn):
+            return fn()
+    return []
 
-    def _join_worker():
-        try:
-            if bot:
-                bot.join_meeting(
-                    url=meeting["meeting_url"],
-                    end_time=end_dt,
-                    auto_leave=meeting.get("auto_leave", True),
-                    title=meeting.get("title", "Online Meeting"),
-                )
-        except Exception as err:
-            print(f"[Server] Join error: {err}")
-        finally:
-            scheduler.mark_completed(meeting_id)
 
-    if bot:
-        threading.Thread(target=_join_worker, daemon=True).start()
-    else:
-        import webbrowser
-        webbrowser.open(meeting["meeting_url"])
-    return {"ok": True, "status": "joining"}
+@app.get("/api/meetings")
+async def list_meetings():
+    return {
+        "meetings": _list_scheduled_meetings(),
+        "summaries": meeting_bot.get_summaries(),
+        "bot_state": meeting_bot.get_state(),
+    }
 
-@app.post("/api/meetings/{meeting_id}/cancel")
-def api_cancel_meeting_by_id(meeting_id: str):
-    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
-    if not scheduler:
-        raise HTTPException(status_code=500, detail="Meeting scheduler not available")
-    ok = scheduler.cancel_meeting(meeting_id)
-    return {"ok": ok, "status": "cancelled" if ok else "not_found"}
+
+@app.get("/api/meetings/summaries")
+async def get_meeting_summaries():
+    return {"summaries": meeting_bot.get_summaries()}
+
+
+@app.post("/api/meetings")
+@app.post("/api/meetings/schedule")
+async def schedule_meeting_route(request: Request):
+    body = await request.json()
+    item = body
+    if meeting_scheduler is not None:
+        if hasattr(meeting_scheduler, "schedule_from_dict"):
+            item = meeting_scheduler.schedule_from_dict(body)
+        elif hasattr(meeting_scheduler, "add_meeting"):
+            item = meeting_scheduler.add_meeting(
+                title=body.get("title", "Scheduled Meeting"),
+                url=body.get("url", ""),
+                start_time=body.get("start_time") or body.get("time") or body.get("datetime"),
+                duration_minutes=int(body.get("duration_minutes", 60)),
+                recurrence=body.get("recurrence", "none"),
+            )
+    return {"status": "ok", "meeting": item, "meetings": _list_scheduled_meetings()}
+
 
 @app.post("/api/meetings/bulk")
-async def api_bulk_import_meetings(request: Request):
-    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
-    if not scheduler:
-        raise HTTPException(status_code=500, detail="Meeting scheduler not available")
-    try:
-        payload = await request.json()
-    except Exception:
-        payload = []
+async def bulk_schedule_meetings_route(request: Request):
+    body = await request.json()
+    text = str(body.get("text") or body.get("schedule_text") or "")
+    added = []
+    if meeting_scheduler and hasattr(meeting_scheduler, "parse_and_schedule_bulk"):
+        added = meeting_scheduler.parse_and_schedule_bulk(text)
+    elif meeting_handler and hasattr(meeting_handler, "handle_command"):
+        added = [meeting_handler.handle_command(line) for line in text.splitlines() if line.strip()]
+    return {"status": "ok", "added": added, "meetings": _list_scheduled_meetings()}
 
-    if isinstance(payload, dict) and "meetings" in payload:
-        entries = payload["meetings"]
-    elif isinstance(payload, list):
-        entries = payload
-    else:
-        entries = []
-    count = scheduler.bulk_import(entries)
-    return {"ok": True, "count": count}
-
-@app.post("/api/meetings/setup")
-def api_meeting_setup():
-    try:
-        proc = MeetingBot.run_account_setup_async()
-        return {"ok": True, "pid": proc.pid, "message": "Browser account setup launched"}
-    except Exception as e:
-        cmd = [sys.executable, "-m", "automation.meeting_bot", "--setup"]
-        p = subprocess.Popen(cmd)
-        return {"ok": True, "pid": p.pid, "message": f"Browser account setup launched: {e}"}
 
 @app.post("/api/meetings/join-url")
-def api_join_meeting_url(req: JoinMeetingRequest):
-    bot = getattr(engine, "meeting_handler", None) and engine.meeting_handler.bot
-    if bot:
-        threading.Thread(
-            target=bot.join_meeting,
-            kwargs={
-                "url": req.url,
-                "title": req.title or "Online Meeting",
-            },
-            daemon=True,
-        ).start()
-    else:
-        import webbrowser
-        webbrowser.open(req.url)
-    return {"ok": True}
+@app.post("/api/meetings/join")
+async def join_meeting_instant_route(request: Request):
+    body = await request.json()
+    url = str(body.get("url", "")).strip()
+    title = str(body.get("title", "Instant Meeting")).strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="Meeting URL is required")
+    return meeting_bot.join_meeting(url=url, title=title)
+
+
+@app.post("/api/meetings/{meeting_id}/join")
+async def join_scheduled_meeting_route(meeting_id: str):
+    meetings = _list_scheduled_meetings()
+    target = next((m for m in meetings if str(m.get("id")) == str(meeting_id)), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return meeting_bot.join_meeting(url=target.get("url", ""), title=target.get("title", "Scheduled Meeting"), meeting_id=meeting_id)
+
+
+@app.delete("/api/meetings/{meeting_id}")
+@app.post("/api/meetings/{meeting_id}/cancel")
+async def cancel_meeting_route(meeting_id: str):
+    if meeting_scheduler:
+        for fn_name in ("remove_meeting", "cancel_meeting", "delete_meeting"):
+            fn = getattr(meeting_scheduler, fn_name, None)
+            if callable(fn):
+                fn(meeting_id)
+                break
+    return {"status": "ok", "meetings": _list_scheduled_meetings()}
+
 
 @app.post("/api/meetings/leave")
-def api_leave_meeting():
-    bot = getattr(engine, "meeting_handler", None) and engine.meeting_handler.bot
-    scheduler = getattr(engine, "meeting_handler", None) and engine.meeting_handler.scheduler
-    if bot:
-        bot.leave_meeting()
-    if scheduler:
-        for m in scheduler.get_active():
-            scheduler.mark_completed(m["id"])
-    return {"ok": True}
+async def leave_meeting_route():
+    return meeting_bot.leave_meeting()
+
+
+@app.post("/api/meetings/setup")
+async def setup_meeting_browser_route():
+    return meeting_bot.open_login_setup()
+
+
+# ==================== ALARMS, SKILLS, MCP & SAFETY ROUTES ====================
 
 @app.get("/api/alarms")
-def api_get_alarms():
-    if ALARMS_FILE.exists():
-        try:
-            return json.loads(ALARMS_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {"alarms": [], "timers": []}
+async def get_alarms_route():
+    alarms_list = alarm_handler.list_alarms() if hasattr(alarm_handler, "list_alarms") else (
+        alarm_handler.get_alarms() if hasattr(alarm_handler, "get_alarms") else []
+    )
+    return {"alarms": alarms_list}
+
 
 @app.post("/api/alarms")
-def api_add_alarm(payload: Dict[str, Any]):
-    data = api_get_alarms()
-    target_list = data.setdefault("alarms" if payload.get("type") != "timer" else "timers", [])
-    payload["id"] = f"alr-{int(time.time())}"
-    target_list.append(payload)
-    ALARMS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return {"ok": True, "data": data}
+async def add_alarm_route(request: Request):
+    body = await request.json()
+    time_str = str(body.get("time") or body.get("alarm_time") or "")
+    label = str(body.get("label") or "Alarm")
+    if hasattr(alarm_handler, "add_alarm"):
+        item = alarm_handler.add_alarm(time_str, label=label)
+    elif hasattr(alarm_handler, "set_alarm"):
+        item = alarm_handler.set_alarm(time_str, label=label)
+    else:
+        item = {"time": time_str, "label": label}
+    alarms_list = alarm_handler.list_alarms() if hasattr(alarm_handler, "list_alarms") else []
+    return {"status": "ok", "alarm": item, "alarms": alarms_list}
+
 
 @app.delete("/api/alarms/{alarm_id}")
-def api_delete_alarm(alarm_id: str):
-    data = api_get_alarms()
-    data["alarms"] = [a for a in data.get("alarms", []) if a.get("id") != alarm_id]
-    data["timers"] = [t for t in data.get("timers", []) if t.get("id") != alarm_id]
-    ALARMS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return {"ok": True}
+async def delete_alarm_route(alarm_id: str):
+    for fn_name in ("remove_alarm", "delete_alarm", "cancel_alarm"):
+        fn = getattr(alarm_handler, fn_name, None)
+        if callable(fn):
+            fn(alarm_id)
+            break
+    alarms_list = alarm_handler.list_alarms() if hasattr(alarm_handler, "list_alarms") else []
+    return {"status": "ok", "alarms": alarms_list}
+
 
 @app.get("/api/skills")
-def api_get_skills():
-    return skill_store.get_skills()
+async def get_skills_route():
+    skills_list = skill_store.list_skills() if (skill_store and hasattr(skill_store, "list_skills")) else (
+        skill_store.get_skills() if (skill_store and hasattr(skill_store, "get_skills")) else []
+    )
+    return {"skills": skills_list, "recording": getattr(skill_store, "recording", False)}
+
 
 @app.post("/api/skills")
-def api_add_skill(skill: Dict[str, Any]):
-    success = skill_store.add_skill(skill)
-    return {"ok": success, "skills": skill_store.get_skills()}
+async def add_skill_route(request: Request):
+    body = await request.json()
+    if skill_store and hasattr(skill_store, "add_skill"):
+        skill_store.add_skill(
+            name=body.get("name", "Custom Skill"),
+            trigger=body.get("trigger", body.get("name", "")),
+            steps=body.get("steps", []),
+        )
+    skills_list = skill_store.list_skills() if (skill_store and hasattr(skill_store, "list_skills")) else []
+    return {"status": "ok", "skills": skills_list}
 
-@app.get("/api/skills/teach/status")
-def api_teach_status():
-    return {"is_teaching": skill_store.is_teaching()}
+
+@app.delete("/api/skills/{skill_name}")
+async def delete_skill_route(skill_name: str):
+    if skill_store:
+        for fn_name in ("remove_skill", "delete_skill"):
+            fn = getattr(skill_store, fn_name, None)
+            if callable(fn):
+                fn(skill_name)
+                break
+    skills_list = skill_store.list_skills() if (skill_store and hasattr(skill_store, "list_skills")) else []
+    return {"status": "ok", "skills": skills_list}
+
 
 @app.post("/api/skills/teach/start")
-def api_teach_start(req: TeachStartRequest):
-    rec = skill_store.start_teach_mode(name=req.name, trigger_phrases=req.trigger_phrases)
-    return {"ok": True, "recording": rec}
+async def start_teach_mode_route(request: Request):
+    body = await request.json()
+    name = str(body.get("name") or body.get("trigger") or "New Routine")
+    if skill_store and hasattr(skill_store, "start_recording"):
+        skill_store.start_recording(name)
+    return {"status": "recording", "name": name}
+
 
 @app.post("/api/skills/teach/stop")
-def api_teach_stop(req: TeachStopRequest):
-    saved = skill_store.stop_teach_mode(save=req.save)
-    return {"ok": True, "saved": saved, "skills": skill_store.get_skills()}
+async def stop_teach_mode_route():
+    res = skill_store.stop_recording() if (skill_store and hasattr(skill_store, "stop_recording")) else {}
+    skills_list = skill_store.list_skills() if (skill_store and hasattr(skill_store, "list_skills")) else []
+    return {"status": "saved", "skill": res, "skills": skills_list}
 
-@app.post("/api/skills/{skill_id}/run")
-def api_run_skill(skill_id: str):
-    res = skill_store.run_skill(skill_id, engine)
-    return res
-
-@app.delete("/api/skills/{skill_id}")
-def api_delete_skill(skill_id: str):
-    success = skill_store.delete_skill(skill_id)
-    return {"ok": success, "skills": skill_store.get_skills()}
 
 @app.get("/api/mcp")
-def api_get_mcp():
-    return {"servers": mcp_client.get_servers(), "tools": mcp_client.list_tools()}
+async def get_mcp_servers_route():
+    servers = mcp_client.list_servers() if (mcp_client and hasattr(mcp_client, "list_servers")) else []
+    return {"servers": servers}
+
 
 @app.post("/api/mcp")
-def api_add_mcp(payload: Dict[str, Any]):
-    name = payload.get("name", "")
-    config = payload.get("config", {})
-    if not name or not config:
-        raise HTTPException(status_code=400, detail="Server name and config required")
-    success = mcp_client.add_server(name, config)
-    return {"ok": success, "servers": mcp_client.get_servers()}
+async def add_mcp_server_route(request: Request):
+    body = await request.json()
+    if mcp_client and hasattr(mcp_client, "add_server"):
+        mcp_client.add_server(body)
+    servers = mcp_client.list_servers() if (mcp_client and hasattr(mcp_client, "list_servers")) else []
+    return {"status": "ok", "servers": servers}
 
-@app.delete("/api/mcp/{name}")
-def api_delete_mcp(name: str):
-    success = mcp_client.remove_server(name)
-    return {"ok": success, "servers": mcp_client.get_servers()}
+
+@app.delete("/api/mcp/{server_id}")
+async def delete_mcp_server_route(server_id: str):
+    if mcp_client and hasattr(mcp_client, "remove_server"):
+        mcp_client.remove_server(server_id)
+    servers = mcp_client.list_servers() if (mcp_client and hasattr(mcp_client, "list_servers")) else []
+    return {"status": "ok", "servers": servers}
+
 
 @app.post("/api/agent/abort")
-def api_agent_abort():
-    os_actuator.abort()
-    return {"ok": True, "aborted": True}
-
-@app.post("/api/approval/{request_id}")
-def api_approval(request_id: str, req: ApprovalRequest):
-    if req.approved:
-        success = safety_interceptor.approve(request_id)
-    else:
-        success = safety_interceptor.deny(request_id)
-    return {"ok": success, "request_id": request_id, "approved": req.approved}
-
-@app.post("/api/system/control")
-def api_system_control(req: SystemControlRequest):
-    if req.action == "volume":
-        engine.system_controls.set_volume(str(req.value))
-    elif req.action == "brightness":
-        engine.system_controls.set_brightness(str(req.value))
-    elif req.action == "app":
-        engine.app_handler.open_application(f"open {req.value}")
-    elif req.action == "workspace_path":
-        workspace_rag.set_workspace_path(str(req.value))
-    return {"ok": True, "action": req.action, "value": req.value}
+async def abort_os_agent_route():
+    aborted = os_agent.abort_current_task()
+    return {"status": "aborted", "aborted": aborted}
 
 
-# ── Mount Frontend Static Bundle ──────────────────────────────────────
+@app.post("/api/approval/{req_id}")
+async def resolve_safety_approval_route(req_id: str, request: Request):
+    body = await request.json()
+    approved = bool(body.get("approved", False))
+    if safety_interceptor and hasattr(safety_interceptor, "resolve_approval"):
+        safety_interceptor.resolve_approval(req_id, approved)
+    return {"status": "ok", "id": req_id, "approved": approved}
+
+
+# Mount built React HUD static files
 if UI_DIST_DIR.exists():
-    app.mount("/assets", StaticFiles(directory=str(UI_DIST_DIR / "assets")), name="assets")
+    assets_dir = UI_DIST_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        file_path = UI_DIST_DIR / full_path
-        if file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(UI_DIST_DIR / "index.html")
-else:
-    @app.get("/")
-    def serve_fallback_placeholder():
-        return HTMLResponse("<h1>JARVIS 2.0 Backend Online. Building HUD Frontend...</h1>")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    print("[JARVIS 2.0] Starting backend on http://127.0.0.1:5050 ...")
-    uvicorn.run("automation.server:app", host="127.0.0.1", port=5050, reload=False)
-
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="API route not found")
+        candidate = UI_DIST_DIR / full_path
+        if full_path and candidate.exists() and candidate.is_file():
+            return FileResponse(str(candidate))
+        index_file = UI_DIST_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(str(index_file))
+        return JSONResponse({"status": "UI build not found in ui/dist"})
