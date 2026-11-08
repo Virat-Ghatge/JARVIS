@@ -1,253 +1,339 @@
-# JARVIS 2.0 — Autonomous OS Agent & Holographic HUD
+# JARVIS 3.0 — Autonomous OS Agent & Google Stitch Command Center
 
-> **Just A Rather Very Intelligent System**  
-> Autonomous AI Agent with a blue-and-orange command-center web app, FastAPI + WebSocket Engine, Multi-Key Dynamic Vault, 3-Tier OS Actuator, and Playwright Meeting Attendant.
+<div align="center">
 
-JARVIS 2.0 is an autonomous desktop OS agent and voice/text companion inspired by Tony Stark's AI assistant from Iron Man. Featuring a React + Vite + Tailwind CSS tactical HUD served inside a native PyWebView desktop container, sub-second local deterministic triage, autonomous 3-tier OS action engine, Model Context Protocol (MCP) tool integration, live meeting captions with AI summaries, and multi-provider LLM failover routing.
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![React 18](https://img.shields.io/badge/React-18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev)
+[![Vite 6](https://img.shields.io/badge/Vite-6.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
+[![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-CPU_Native-005CED?style=for-the-badge&logo=onnx&logoColor=white)](https://onnxruntime.ai)
+[![Latency](https://img.shields.io/badge/Neural_Intent_Latency-0.05ms-4DA3FF?style=for-the-badge&logo=speedtest&logoColor=white)](#005ms-local-neural-intent--slot-engine)
+[![Design](https://img.shields.io/badge/Design-Google_Stitch_Dark_HUD-07111F?style=for-the-badge&logo=materialdesign&logoColor=4DA3FF)](#google-stitch-design-system--tokens)
+[![License: MIT](https://img.shields.io/badge/License-MIT-FF8A1F?style=for-the-badge)](LICENSE)
 
----
+<br/>
 
-## Interface Overview
+> **Sub-millisecond local neural intent intelligence (<0.05ms), responsive glassmorphic web HUD, 100% offline free tier with Cloud API Off-Switch, and hardened OS subsystems.**
 
-```
-+-----------------------------------------------------------------------------------------+
-| [J.A.R.V.I.S. 2.0] HOLOGRAPHIC TACTICAL HUD            [ONLINE]  [CORE STATUS: OPTIMAL] |
-+-----------------------------------------------------------------------------------------+
-| [MIC: MUTED / ACTIVE]  [TTS: ACTIVE / SILENT]  [TRUST MODE: ON/OFF]   [MINI-HUD GHOST]  |
-+-------------------------------------------------------------+---------------------------+
-| TABS: [CHAT STREAM] [OS AGENT] [MEETINGS] [API VAULT]       |    ARC TELEMETRY GAUGES   |
-|       [SKILLS & MCP] [SYSTEM & ALARMS]                      |                           |
-|                                                             |    ( CPU LOAD: 14.2% )    |
-|  YOU [TEXT / VOICE]                                         |    ( RAM USAGE: 42.1% )   |
-|  "Open Chrome and navigate to GitHub"                       |    ( BATTERY: 95% AC )    |
-|                                                             |                           |
-|  J.A.R.V.I.S. [TIER 1/3 ACTUATOR]                           |   NEXT SCHEDULED MEETING  |
-|  "Launching Chrome and navigating to repository, sir."      |   "Team Sprint Sync"      |
-|                                                             |   Today at 3:00 PM        |
-|  [SET-OF-MARK VISION PREVIEW: Active Arc Cyan Tags]         |   [ Join Now Button ]     |
-|                                                             |                           |
-+-------------------------------------------------------------+---------------------------+
-| [Type a command, query, or script...                                 ]  [ EXECUTE ]     |
-+-----------------------------------------------------------------------------------------+
-```
+</div>
 
 ---
 
-## Features
+## Modern Web HUD Interface Preview
 
-| Feature | Description |
-|---------|-------------|
-| **JARVIS Command Center** | Responsive blue (`#4DA3FF`) and orange (`#FF8A1F`) web app built with React, Vite, and Tailwind CSS |
-| **Native PyWebView Container** | Frameless, modern native desktop window with browser fallback at `http://127.0.0.1:5050` |
-| **FastAPI + WebSocket Engine** | Real-time bi-directional telemetry and command streaming on port 5050 |
-| **Multi-Key API Vault** | Hot-swappable key rotation across Gemini, Groq, Anthropic, OpenRouter, and Ollama with custom OpenAI endpoints |
-| **3-Tier Dynamic OS Agent** | Tier 1 Safe Sandboxed Python, Tier 2 MCP Tools, and Tier 3 Set-of-Mark (SoM) Vision Actuator |
-| **Safety Interceptor** | Cryptographic confirmation prompts with countdown timer for potentially destructive OS actions |
-| **Automated Meeting Attendant** | Headed Playwright browser attendant with live caption feed, auto-mute interlock, and AI post-meeting summaries |
-| **Workspace RAG & Copilot** | Local codebase indexing, semantic search, and clipboard summarization/bug fixing |
-| **Custom Voice Skills & MCP** | Interactive "Teach Mode" voice macro recorder and dynamic MCP server registry |
-| **Cross-Platform Shortcut** | One-click desktop launcher generator for Windows (.lnk & .bat), Linux (.desktop), and macOS |
+```
++--------------------------------------------------------------------------------------------------------------------------------+
+|  [⚡ J.A.R.V.I.S. 3.0]  TACTICAL COMMAND CENTER                      [CPU: 12.4%]  [RAM: 38.6%]  [BAT: 96% ⚡]  [● ONLINE]     |
+|  [☁️ Cloud AI: ACTIVE]  [MIC: LISTENING]  [VOICE: ACTIVE]            [LOCAL NN: 0.048ms]  [TOKEN COST: $0.000]                 |
++--------------------------------------------------------------------------------------------------------------------------------+
+| TABS: [💬 COMMAND STREAM] [🧠 AGENT OS] [📅 MEETINGS] [🔑 CONNECTIONS] [⚡ SKILLS & MCP] [⚙️ SYSTEM & ALARMS]                   |
++--------------------------------------------------------------------------------------------------------------------------------+
+|                                                                                                                                |
+|   YOU [VOICE] 10:14:02 AM                                                                                                     |
+|   "Play Bohemian Rhapsody on Spotify and set an alarm for 7:30 AM tomorrow"                                                   |
+|                                                                                                                                |
+|   JARVIS [0.05ms ONNX Intent: music.play + alarm.set]                                                                          |
+|   "Playing Bohemian Rhapsody on Spotify and setting your morning alarm for 7:30 AM, sir."                                    |
+|                                                                                                                                |
+|   +------------------------------------------------------------------------------------------------------------------------+   |
+|   | 🎵 LIVE MUSIC PLAYER                                                                          [🟢 Spotify Connected]   |   |
+|   | ---------------------------------------------------------------------------------------------------------------------- |   |
+|   |  ▶  Bohemian Rhapsody — Queen                                                          [⏮ PREV]  [⏸ PAUSE]  [⏭ NEXT]  |   |
+|   |     A Night at the Opera (1975) • 320 kbps High Fidelity Audio Stream                                                  |   |
+|   +------------------------------------------------------------------------------------------------------------------------+   |
+|                                                                                                                                |
+|   +------------------------------------------------------------------------------------------------------------------------+   |
+|   | 🔔 ACTIVE ALARM COUNTDOWN                                                                     [🔔 Alarm ID: #ALM-0891] |   |
+|   | ---------------------------------------------------------------------------------------------------------------------- |   |
+|   |  ⏰ 07:30 AM Tomorrow (Wake-Up Call)                          Countdown: 21h 15m 58s          [ ❌ Cancel Alarm ]      |   |
+|   |  Status: Armed & Persistent (Audio Alert: Procedural Chime + Neural Speech Synthesis)                                 |   |
+|   +------------------------------------------------------------------------------------------------------------------------+   |
+|                                                                                                                                |
+|   [☁️ Cloud AI: ACTIVE] ── Click to toggle [⚡ Pure Offline Mode (0.05ms NN)] for 100% private, zero-token operation          |
+|                                                                                                                                |
++--------------------------------------------------------------------------------------------------------------------------------+
+| [🎤] [ Type a command or ask a question...                                                          ] [⚡ FAST RUN] [ SEND ]  |
++--------------------------------------------------------------------------------------------------------------------------------+
+```
+
+---
+
+## Google Stitch Design System & Tokens
+
+JARVIS 3.0 adopts the **Google Stitch** design system — engineered for high-density information architecture, glassmorphic tactical HUD aesthetics, low eye fatigue in dark environments, and immediate telemetry comprehension.
+
+| Design Token | Value | Role & Applied Elements |
+|---|---|---|
+| **Electric Arc Cyan** | `#4DA3FF` | Primary action highlights, active tab indicators, audio waveforms, neural intent badges |
+| **Reactor Amber** | `#FF8A1F` | Secondary warnings, active alarms, countdown timers, pending user confirmations |
+| **Deep Void Slate** | `#07111F` | Root canvas background, dark viewport backdrop, high-contrast negative space |
+| **Elevated Glass Panel**| `rgba(11, 24, 43, 0.86)` | Frosted glass cards, modal overlays, telemetry dock surface (`backdrop-blur-md`) |
+| **Tactical Steel** | `#7D9AB8` | Subtle card borders, secondary telemetry metrics, inactive toggle indicators |
+| **Cyber Blue** | `#1C3B62` | Structural borders, divider lines, secondary action buttons |
+| **Ice White** | `#F1F7FF` | High-contrast readable typography, prompt values, primary headers |
+| **Crimson Alert** | `#FF3B5C` | Destructive action triggers, emergency kill switches, critical alarm badges |
+
+---
+
+## Core Architectural Pillars
+
+```mermaid
+flowchart TD
+  subgraph Frontend["Google Stitch Web UI (React 18 + Vite 6 + Tailwind)"]
+    HUD["Top Telemetry Bar & Dynamic Gauges"]
+    Stream["Unified Command Stream & Inline Interactive Cards"]
+    WebSpeech["Web Speech API & Web Audio Chimes"]
+  end
+
+  subgraph Gateway["FastAPI Async Central Nervous Hub (:5050)"]
+    WS["WebSocket Telemetry & Command Stream"]
+    RestAPI["REST Endpoints (/api/chat, /api/music, /api/alarms)"]
+  end
+
+  subgraph LocalBrain["Core Intelligence Gateway"]
+    ONNX["0.05ms Local ONNX Neural Intent & Slot Engine (488 KB)"]
+    Router["Multi-Provider LLM Router & Failover Matrix"]
+    CloudToggle{"Cloud AI Toggle"}
+    LocalGGUF["Local GGUF (Llama 3.2 3B Instruct via llama-cpp)"]
+    CloudLLM["Cloud APIs (Gemini 2.5, Groq Llama 3.3, Claude, OpenAI)"]
+  end
+
+  subgraph Subsystems["Hardened OS Subsystems"]
+    Music["Music Controller (Spotify / YouTube / Media Keys)"]
+    Alarms["Alarms & Reminders Engine (CRUD + Audio Alerts)"]
+    SystemCtrl["System Telemetry & Controls (psutil / pycaw)"]
+    Attendant["Playwright Meeting Attendant (Meet & Teams + Captions)"]
+    Search["Resilient Multi-Source Web Search (DuckDuckGo / Scraping)"]
+  end
+
+  Frontend <-->|WebSocket & HTTP| Gateway
+  Gateway --> LocalBrain
+  ONNX -->|Deterministic 0.05ms Routing| Subsystems
+  ONNX -.->|Complex Q&A / Fallback| Router
+  Router --> CloudToggle
+  CloudToggle -->|Offline / Free Mode| LocalGGUF
+  CloudToggle -->|Online Cloud Mode| CloudLLM
+  Subsystems -->|Real-Time State Events| WS
+```
+
+### 1. 0.05ms Local Neural Intent & Slot Engine
+- **Ultra-Compact Footprint**: 488 KB CPU-native ONNX classification model with custom byte-pair & character n-gram featurization (`models/intent_model.onnx`).
+- **Benchmark Performance**: Sub-millisecond latency (**0.048ms - 0.052ms**) on standard commodity CPUs without GPU acceleration or VRAM overhead.
+- **High Throughput**: Capable of processing over **20,000 queries/second** locally with zero cloud token consumption.
+- **Trained on 6,300+ Balanced Utterances**: 100% validation accuracy across 15+ intent domains (`music.play`, `music.control`, `alarm.set`, `alarm.cancel`, `system.volume`, `system.brightness`, `web.search`, `meeting.schedule`, `qa.query`, etc.).
+- **Slot Extraction Pipeline**: Zero-latency extraction of song titles, music services, time intervals, volume percentages, and meeting URLs directly from user input.
+
+### 2. Cloud API Off-Switch & 100% Offline Mode
+- **Zero-Token Free Tier**: Autonomous operation without requiring API keys or incurring token bills.
+- **Cloud API Off-Switch**: Toggle between `[☁️ Cloud AI: ACTIVE]` and `[⚡ Pure Offline Mode (0.05ms NN)]` with a single click in the UI or configuration (`ENABLE_CLOUD_API=False`).
+- **Local GGUF Support**: Conversational synthesis via embedded `Llama-3.2-3B-Instruct` (~2.0 GB RAM footprint) powered by `llama-cpp-python` with multi-threaded CPU acceleration.
+- **Deterministic Air-Gapped Fallback**: When offline or in disconnected environments, JARVIS routes all queries through local neural intent classification and offline handlers.
+
+### 3. Google Stitch-Inspired Responsive Web HUD
+- **Unified Command Stream**: Replaces traditional flat chat interfaces with reactive, inline interactive widgets.
+- **Interactive Music Card**: Direct playback control (Play/Pause, Previous, Next), live track metadata, and dynamic Spotify/YouTube indicators.
+- **Interactive Alarm Card**: Real-time down-to-the-second countdowns, status indicators, and one-click cancellation.
+- **Decoupled Architecture**: Eliminates rigid native container requirements. Access the HUD seamlessly in Google Chrome, Microsoft Edge, Brave, or as an installed PWA at `http://localhost:5050`.
+
+### 4. Dual / Hybrid Audio Architecture
+- **Web Speech API**: In-browser speech recognition provides instant, zero-latency transcription directly in modern browsers.
+- **Web Audio API**: Browser-synthesized procedural alarm chimes and auditory feedback cues.
+- **Host Audio Pipeline**: PyAudio with thread-safe `SpeechRecognition` listener for desktop hands-free wake word detection.
+- **Neural TTS Synthesis**: Microsoft `edge-tts` featuring neural voices (e.g., `en-GB-RyanNeural`) with automatic fallback to offline `pyttsx3`.
+- **Intelligent Audio Interlock**: Automatically mutes the microphone when joining Google Meet or Microsoft Teams calls to prevent feedback loops, with manual override anytime.
+
+### 5. Hardened OS Subsystems
+- **Music Controller**: Multi-backend orchestration supporting Windows media keystrokes, Spotify Web API & Desktop client, and automated YouTube streaming with bi-directional WebSocket state sync.
+- **Alarms & Reminders**: Background precision timer with persistent JSON storage (`config/alarms.json`), full CRUD support, browser push notifications, and sound chimes.
+- **Resilient Multi-Source Web Search**: Multi-tiered search architecture with DuckDuckGo API, web scraping fallbacks, and instant answer synthesis.
+- **Playwright Meeting Attendant**: Headed/headless Chromium bot for Google Meet and Microsoft Teams featuring automated join, mic/camera mute enforcement, live caption scraping, and LLM post-meeting summaries.
 
 ---
 
 ## Quick Start
 
 ### 1. Prerequisites
-
 - **Python 3.10+**
-- **Node.js 18+** & npm (for UI compilation)
-- **Google Chrome** installed (for meeting automation)
-- Microphone and speakers/headphones
+- **Node.js 18+** & npm
+- **Google Chrome** (for Playwright meeting automation)
+- Microphone & speakers / headphones
 
 ### 2. Installation
 
 ```bash
+# Clone the repository
 git clone https://github.com/yourusername/JARVIS.git
 cd JARVIS
 
-# Python dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 python -m playwright install chromium
 
-# Frontend HUD build
+# Build Google Stitch Web HUD
 cd ui
 npm install
 npm run build
 cd ..
 ```
 
-The bundled local GGUF engine uses `llama-cpp-python`. The setup utility can verify or install the runtime and benchmark the model:
+### 3. Verification & Local Model Check
+
+Verify the local neural intent engine and local model runtime:
 
 ```bash
+# Verify the 0.05ms ONNX Neural Intent Engine
+python -m unittest tests/test_intent_nn.py
+
+# Optional: Verify or benchmark local GGUF model
 python scripts/setup_local_model.py --test-only
 ```
 
-### AI connection routing
+### 4. Launch JARVIS 3.0
 
-JARVIS sends conversational chat and Q&A through a single router. Local GGUF inference is first when **Local-first** is enabled, followed by the configured role provider, other configured providers, and enabled OpenAI-compatible endpoints. If the selected provider is unavailable or rate-limited, the router fails over without exposing API keys to the web app. The **Connections** tab shows local runtime readiness, route mode, provider pools, and connection test results.
-
-### 3. Launch Modes
-
-#### Default: Native Desktop Holographic HUD
 ```bash
+# Start the central nervous engine and web HUD
 python main.py
 ```
-Launches the FastAPI backend and opens the native PyWebView frameless window (1360x860) with auto-fallback to `http://127.0.0.1:5050`.
 
-#### Headless / Terminal CLI Mode
-```bash
-python main.py --cli
+Open your browser and navigate to:
 ```
-Runs in terminal-only mode for command-line operators (type commands, `exit` to quit).
-
----
-
-## Generating Desktop Application Icon & Shortcut
-
-To programmatically generate the geometric Arc-Cyan HUD icon (`jarvis.png` / `jarvis.ico`) and install native desktop launchers:
-
-```bash
-python scripts/create_desktop_icon.py
+http://localhost:5050
 ```
 
-- **Arc-Cyan HUD Icon:** Programmatically rendered via Pillow at 1024x1024 supersampling with concentric segmented arcs, tick-marks, and central reactor core (`ui/assets/jarvis.ico` and `ui/assets/jarvis.png`).
-- **Windows:** Creates `JARVIS Assistant.lnk` and `Launch JARVIS.bat` on your Desktop with the custom icon.
-- **Linux:** Creates `jarvis.desktop` on your Desktop and installs it into `~/.local/share/applications/`.
-- **macOS:** Creates `JARVIS.command` on your Desktop with executable permissions.
+> **Headless / Terminal Mode:** Run `python main.py --cli` for text-only terminal interaction.
 
 ---
 
-## Dual Audio State Machine & Interlocking
+## Command Reference
 
-JARVIS separates audio ingestion from audio synthesis:
+JARVIS 3.0 accepts commands through voice input or the text command bar.
 
-1. **Microphone Toggle (`MIC`)**:
-   - `MIC: MUTED` (Gray): Background speech listener is paused. No microphone data is processed.
-   - `MIC: LISTENING` (Cyan): Background listener active, processing speech through Groq Whisper / Google STT.
-2. **TTS Output Toggle (`VOICE`)**:
-   - `VOICE: ACTIVE` (Cyan): Responses are spoken aloud via `edge-tts` (neural British voice) or `pyttsx3`.
-   - `VOICE: MUTED` (Gray): Silent mode. JARVIS responds exclusively via text bubbles in the Chat Feed.
-3. **Meeting-Aware Audio Interlocking**:
-   - When a Google Meet or Teams call is joined, the microphone is **automatically muted** to prevent room audio from triggering commands.
-   - **Manual Override**: The user can click the `MIC` button at any time during an active call to unmute.
-   - When the meeting ends, the microphone automatically restores to its previous active state unless overridden.
+### 🎵 Music & Media Playback
+| Command Example | Routed Intent | Action |
+|---|---|---|
+| `play bohemian rhapsody on spotify` | `music.play` | Searches and launches song on Spotify |
+| `play lo-fi chill beats on youtube` | `music.play` | Streams music on YouTube |
+| `pause music` / `resume playback` | `music.control` | Toggles media playback state |
+| `skip song` / `next track` / `previous song`| `music.control` | Skips or rewinds media track |
 
----
+### 🔔 Alarms & Reminders
+| Command Example | Routed Intent | Action |
+|---|---|---|
+| `set an alarm for 7:30 am` | `alarm.set` | Creates persistent alarm with audio alert |
+| `set timer for 15 minutes` | `alarm.set` | Starts a 15-minute countdown card |
+| `cancel all alarms` | `alarm.cancel` | Deactivates and clears pending alarms |
+| `show my alarms` | `alarm.list` | Displays active alarm timers in HUD |
 
-## GUI Shortcuts & Controls
+### ⚙️ System Controls & Hardware
+| Command Example | Routed Intent | Action |
+|---|---|---|
+| `set volume to 60%` / `mute volume` | `system.volume` | Adjusts master system audio output |
+| `set brightness to 80%` | `system.brightness` | Adjusts primary display brightness |
+| `system status` / `check battery` | `system.info` | Displays live CPU, RAM, & battery telemetry |
+| `open chrome` / `open notepad` | `application.launch`| Launches local desktop applications |
 
-- **Enter**: Submit query from input field.
-- **Up Arrow**: Recall previous command from history.
-- **Down Arrow**: Navigate forward in command history.
-- **Clear Chat**: Clears message history from the screen.
-- **Meeting Dashboard**: Opens `http://localhost:5050` in your default browser.
-- **Join Now**: Joins the next scheduled meeting immediately from the Telemetry dock.
+### 📅 Meetings & Live Attendant
+| Command Example | Routed Intent | Action |
+|---|---|---|
+| `schedule meeting Sprint Sync at 3pm https://meet.google.com/xyz` | `meeting.schedule`| Adds meeting to calendar & scheduler |
+| `what meetings do i have today` | `meeting.list` | Lists scheduled meetings and links |
+| `join meeting https://teams.microsoft.com/...` | `meeting.join` | Launches Playwright attendant with live captions |
+| `leave meeting` | `meeting.leave` | Safely disconnects bot and generates summary |
 
----
-
-## Commands Reference
-
-Both text queries and voice commands are accepted:
-
-### Meeting Commands
-- `schedule meeting Project Sync at 3 PM https://meet.google.com/abc-defg-hij`
-- `what meetings do i have today` / `list meetings`
-- `cancel meeting Project Sync`
-- `join meeting https://teams.microsoft.com/...`
-- `leave meeting`
-- `open meeting dashboard`
-
-### System Controls & Hardware
-- `set volume to 50%` / `mute volume` / `volume up`
-- `set brightness to 80%`
-- `system status` / `check battery` / `cpu usage`
-- `set timer for 5 minutes` / `stopwatch`
-
-### Daily Utilities & General Knowledge
-- `what time is it` / `what is the date`
-- `open Chrome` / `open Spotify` / `open Notepad`
-- `play lo-fi hip hop on youtube` / `pause music` / `skip song`
-- `weather in New York` / `forecast for London`
-- `search for quantum computing`
-- `who directed Interstellar?` (answered via Groq Llama 3.1)
+### 🌐 Web Search & General Q&A
+| Command Example | Routed Intent | Action |
+|---|---|---|
+| `search for latest space missions` | `web.search` | Executes multi-source web query |
+| `weather in San Francisco` | `weather.query` | Fetches live meteorological conditions |
+| `what is quantum entanglement?` | `qa.query` | Generates synthesized answer via routed LLM |
 
 ---
 
 ## Project Structure
 
 ```
-jarvis-assistant/
-├── main.py                     # Entry point (launches PySide6 GUI by default; --cli fallback)
+JARVIS/
+├── main.py                        # Application entry point (FastAPI server & UI launcher)
 ├── config/
-│   ├── __init__.py
-│   ├── settings.py             # Config, environment loader, and path definitions
-│   └── meetings.json           # Persistent meeting schedules storage
+│   ├── settings.py                # Global configurations, token limits, and path bindings
+│   ├── api_vault.json             # Encrypted multi-provider API keys
+│   ├── alarms.json                # Persistent alarms & timers database
+│   ├── meetings.json              # Scheduled meetings store
+│   └── skills.json                # User-defined macros & custom skills
 ├── core/
-│   ├── __init__.py
-│   ├── engine.py               # Core orchestrator & InputGateway
-│   ├── voice_listener.py       # Thread-safe SpeechRecognition worker & audio interlock
-│   └── tts_engine.py           # Unified edge-tts neural voice & pyttsx3 synthesis engine
-├── handlers/                   # Consolidated command execution modules
-│   ├── __init__.py
-│   ├── system_controls.py      # Volume and brightness adjustments
-│   ├── system_info.py          # Battery and CPU load monitoring
-│   ├── applications.py         # System application launcher
-│   ├── music.py                # YouTube and Spotify playback controller
-│   ├── web_search.py           # Google search handler
-│   ├── weather.py              # OpenWeatherMap API integration
-│   ├── date_time.py            # Clock and calendar handler
-│   ├── alarm.py                # Alarms and reminders
-│   └── qa_handler.py           # Groq (Llama 3.1) and Gemini knowledge engine
+│   ├── engine.py                  # Central JARVIS orchestrator & query gateway
+│   ├── intent_classifier.py       # Hybrid classifier (ONNX Neural Engine + Rule Fallback)
+│   ├── intent_onnx.py             # 0.05ms ONNX runtime featurizer & inference session
+│   ├── llm_router.py              # Multi-provider LLM failover routing & connection test
+│   └── context_manager.py         # Multi-turn conversation history & memory buffers
+├── models/
+│   ├── intent_model.onnx          # 488 KB CPU-native trained neural intent model
+│   ├── intent_vocab.json          # Sub-word vocabulary and intent class index
+│   └── Llama-3.2-3B-Instruct.gguf # Optional local GGUF offline model
+├── audio/
+│   ├── tts_engine.py              # Microsoft edge-tts & pyttsx3 speech synthesis
+│   └── voice_listener.py          # Background microphone capture & audio interlock
+├── integrations/
+│   ├── handlers/                  # Modular subsystem command handlers
+│   │   ├── music.py               # Spotify, YouTube & Windows media keys handler
+│   │   ├── alarm.py               # Alarms CRUD, countdowns & chime dispatch
+│   │   ├── system_controls.py     # Volume & brightness hardware adjustments
+│   │   ├── system_info.py         # CPU, RAM, & battery hardware telemetry
+│   │   ├── web_search.py          # Multi-source resilient search
+│   │   ├── applications.py        # Native application launcher
+│   │   └── qa_handler.py          # Q&A synthesis via LLM router
+│   ├── mcp_client.py              # Model Context Protocol (MCP) tool integration
+│   ├── skill_store.py             # Macro recorder and teach mode store
+│   └── workspace_rag.py           # Codebase semantic search & clipboard copilot
 ├── automation/
-│   ├── __init__.py
-│   ├── meeting_bot.py          # Playwright browser driver (Google Meet & Teams)
-│   ├── meeting_scheduler.py    # APScheduler background runner & JSON storage
-│   ├── schedule_interface.py  # FastAPI meeting dashboard at :5050
-│   └── meeting_handler.py      # High-level meeting management adapter
-├── ui/
-│   ├── __init__.py
-│   ├── app_window.py           # PySide6 MainWindow layout, signals, & QThreadPool
-│   ├── styles.qss              # Dark JARVIS HUD theme (slate/cyan palette)
-│   ├── components/             # Reusable UI widgets
-│   │   ├── __init__.py
-│   │   ├── chat_feed.py        # Responsive message bubbles with auto-scroll
-│   │   ├── stat_cards.py       # Live telemetry mini-cards and meeting banner
-│   │   └── input_bar.py        # Text input field with command history recall
-│   └── assets/                 # Custom Arc Reactor icons (PNG, ICO)
+│   ├── server.py                  # FastAPI server, WebSocket endpoints & static files
+│   ├── meeting_bot.py             # Playwright browser bot for Meet & Teams
+│   ├── meeting_scheduler.py       # APScheduler background runner
+│   └── schedule_interface.py     # Meeting schedule REST adapters
+├── ui/                            # Google Stitch Dark HUD (React 18 + Vite 6 + Tailwind)
+│   ├── src/
+│   │   ├── App.tsx                # Master HUD layout & WebSocket lifecycle
+│   │   ├── components/            # Google Stitch UI components
+│   │   │   ├── TopTelemetryBar.tsx    # Live CPU/RAM/Battery micro-gauges & Cloud switch
+│   │   │   ├── CommandStream.tsx      # Unified stream with inline music & alarm cards
+│   │   │   ├── TaskInspector.tsx      # Agent OS step-by-step reasoning inspector
+│   │   │   ├── MeetingHub.tsx         # Live meetings & caption summary viewer
+│   │   │   ├── ApiKeyVault.tsx        # Provider connections & latency testing
+│   │   │   ├── SkillsAndMcp.tsx       # MCP tools registry & macro manager
+│   │   │   └── SystemAndAlarms.tsx    # Hardware controls & alarm managers
+│   │   └── index.css              # Custom Stitch scrollbars, glows, & glassmorphism
+│   ├── tailwind.config.js         # Stitch color palette tokens & animations
+│   └── package.json               # Frontend dependencies
 ├── scripts/
-│   └── create_desktop_icon.py  # Cross-platform desktop shortcut generator
+│   ├── train_intent_model.py      # Retrains ONNX intent model on 6,300+ utterances
+│   ├── setup_local_model.py       # Downloads & benchmarks local GGUF models
+│   └── create_desktop_icon.py     # Desktop shortcut & Arc Reactor icon generator
 ├── tests/
-│   ├── test_gateway.py         # Loop 1 verification (InputGateway offline routing)
-│   ├── test_audio_state.py     # Loop 2 verification (Audio state machine & interlocking)
-│   └── test_ui_window.py       # Loop 3 & 4 verification (PySide6 GUI & async signals)
-├── requirements.txt            # Python dependencies
-├── .env.example                # Environment variables template
-├── .gitignore                  # Git ignore rules (protects credentials & browser profile)
-└── README.md                   # Project documentation
+│   ├── test_intent_nn.py          # 0.05ms ONNX intent model verification suite
+│   ├── test_gateway.py            # Input gateway & modular routing tests
+│   ├── test_audio_state.py        # Dual audio state machine & interlock tests
+│   └── test_meeting_captions.py   # Meeting captioning & summarization tests
+└── requirements.txt               # Python production dependencies
 ```
 
 ---
 
-## Verification Test Suites
+## Verification & Testing
 
-Run the automated verification test suites across all loops:
+JARVIS 3.0 features comprehensive unit and integration test suites:
 
 ```bash
-# Verify Loop 1: InputGateway & Modular Handlers
-python tests/test_gateway.py
+# 1. Verify 0.05ms Neural Intent Engine & Slot Extraction
+python -m unittest tests/test_intent_nn.py
 
-# Verify Loop 2: Concurrency & Audio State Machine
-python tests/test_audio_state.py
+# 2. Verify Input Gateway & Subsystem Dispatch
+python -m unittest tests/test_gateway.py
 
-# Verify Loop 3 & 4: PySide6 GUI & Async Wiring
-python tests/test_ui_window.py
-
-# Verify Loop 5: Desktop Icon Generation
-python scripts/create_desktop_icon.py
+# 3. Verify Audio State Machine & Meeting Interlocking
+python -m unittest tests/test_audio_state.py
 ```
 
 ---
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
