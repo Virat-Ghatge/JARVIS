@@ -1,42 +1,1872 @@
 [
   {
-    "id": "c8dd80f6",
-    "title": "ml",
-    "platform": "teams",
-    "meeting_url": "https://teams.microsoft.com/meet/346269858796231?p=ouzAhf5OzT2CVvQnCG",
-    "start_time": "2026-10-22T15:30:00",
-    "end_time": "2026-10-22T16:30:00",
+    "id": "a5d75f44",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-30T23:36:49",
+    "end_time": "2026-10-31T00:36:49",
     "auto_leave": true,
-    "status": "completed"
+    "status": "cancelled"
   },
   {
-    "id": "5d086961",
-    "title": "cn",
+    "id": "880a737b",
+    "title": "Bulk Sync B",
     "platform": "teams",
-    "meeting_url": "https://teams.microsoft.com/meet/3220552006227025?p=IK2NoqQgXIFByfNvko",
-    "start_time": "2026-10-22T14:00:00",
-    "end_time": "2026-10-22T15:00:00",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-10-31T23:36:49",
+    "end_time": "2026-11-01T00:36:49",
     "auto_leave": true,
-    "status": "completed"
+    "status": "cancelled"
   },
   {
-    "id": "3f7fb06d",
-    "title": "special cn",
-    "platform": "teams",
-    "meeting_url": "https://teams.microsoft.com/meet/3561870065249808?p=OxcHpdCw7broIHtWtn",
-    "start_time": "2026-10-22T14:00:00",
-    "end_time": "2026-10-22T15:00:00",
+    "id": "49eaeab4",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T01:36:49.453774",
+    "end_time": "2026-10-30T02:36:49.453774",
     "auto_leave": true,
-    "status": "completed"
+    "status": "cancelled"
   },
   {
-    "id": "e5290eff",
+    "id": "2ce5cd0f",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-30T23:37:30",
+    "end_time": "2026-10-31T00:37:30",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "879c5c45",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-10-31T23:37:30",
+    "end_time": "2026-11-01T00:37:30",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "6e7cac7d",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T01:37:30.784820",
+    "end_time": "2026-10-30T02:37:30.784820",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "5f40be3a",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-30T23:38:58",
+    "end_time": "2026-10-31T00:38:58",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "77ba866e",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-10-31T23:38:58",
+    "end_time": "2026-11-01T00:38:58",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "b3ec3432",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T01:38:58.485947",
+    "end_time": "2026-10-30T02:38:58.485947",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "9d34b564",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-30T23:40:35",
+    "end_time": "2026-10-31T00:40:35",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "bc1132f7",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-10-31T23:40:35",
+    "end_time": "2026-11-01T00:40:35",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d2c1288d",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T01:40:35.385103",
+    "end_time": "2026-10-30T02:40:35.385103",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "cd7700f6",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-30T23:41:59",
+    "end_time": "2026-10-31T00:41:59",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "bcd9ba23",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-10-31T23:41:59",
+    "end_time": "2026-11-01T00:41:59",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "10a7ebd5",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T01:42:00.040928",
+    "end_time": "2026-10-30T02:42:00.040928",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "29f9a415",
     "title": "Integration Standup Test",
     "platform": "google_meet",
     "meeting_url": "https://meet.google.com/abc-defg-hij",
     "start_time": "2026-10-21T16:00:00",
     "end_time": "2026-10-21T17:00:00",
     "auto_leave": true,
-    "status": "completed"
+    "status": "cancelled"
+  },
+  {
+    "id": "d220262c",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d8de93cd",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-30T23:46:16",
+    "end_time": "2026-10-31T00:46:16",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "81512f81",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-10-31T23:46:16",
+    "end_time": "2026-11-01T00:46:16",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "3db40e92",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T01:46:16.534172",
+    "end_time": "2026-10-30T02:46:16.534172",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "0dd5c43e",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "54248713",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d138af6e",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-30T23:46:31",
+    "end_time": "2026-10-31T00:46:31",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "f91fde1c",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-10-31T23:46:31",
+    "end_time": "2026-11-01T00:46:31",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "695d063f",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T01:46:31.691051",
+    "end_time": "2026-10-30T02:46:31.691051",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "ec9281f7",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "8352498c",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "0116e672",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-30T23:47:38",
+    "end_time": "2026-10-31T00:47:38",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "f2c9c19a",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-10-31T23:47:38",
+    "end_time": "2026-11-01T00:47:38",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "0b584d53",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T01:47:38.935307",
+    "end_time": "2026-10-30T02:47:38.935307",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "8fe17b78",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d71adeec",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "4183f63f",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:00:56",
+    "end_time": "2026-10-31T02:00:56",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2a668a00",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:00:56",
+    "end_time": "2026-11-01T02:00:56",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "18a55c37",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:00:56.340980",
+    "end_time": "2026-10-30T04:00:56.340980",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "abae8e3e",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "a0d369e1",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "801369b4",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:10:05",
+    "end_time": "2026-10-31T02:10:05",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "dd80a4ac",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:10:05",
+    "end_time": "2026-11-01T02:10:05",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "b5e150c8",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:10:05.719281",
+    "end_time": "2026-10-30T04:10:05.719281",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "76590792",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "7cffb47a",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "cb45dad3",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:12:45",
+    "end_time": "2026-10-31T02:12:45",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "dbc5cc6a",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:12:45",
+    "end_time": "2026-11-01T02:12:45",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "3f341baf",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:12:45.481126",
+    "end_time": "2026-10-30T04:12:45.481126",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "94dcfba7",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "e65cdd01",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "30d11fb2",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:27:45",
+    "end_time": "2026-10-31T02:27:45",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "139747b5",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:27:45",
+    "end_time": "2026-11-01T02:27:45",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "a24889b0",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:27:45.332942",
+    "end_time": "2026-10-30T04:27:45.332942",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "5e2e0244",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "03f1aad6",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "df69e01c",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:29:23",
+    "end_time": "2026-10-31T02:29:23",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "e1ed372b",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:29:23",
+    "end_time": "2026-11-01T02:29:23",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "b295e83a",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:29:23.939222",
+    "end_time": "2026-10-30T04:29:23.939222",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "beb3b8b1",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "5615200e",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "fe470a58",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:30:26",
+    "end_time": "2026-10-31T02:30:26",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "55baae49",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:30:26",
+    "end_time": "2026-11-01T02:30:26",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "ea3ab0f4",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:30:27.078463",
+    "end_time": "2026-10-30T04:30:27.078463",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "f8d92fcd",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "4b605a89",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "5e149999",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:34:44",
+    "end_time": "2026-10-31T02:34:44",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "3ee7dc13",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:34:44",
+    "end_time": "2026-11-01T02:34:44",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "dfa3bc17",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:34:44.684854",
+    "end_time": "2026-10-30T04:34:44.684854",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "5ca16ec4",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2c42630a",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "c6828995",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:41:27",
+    "end_time": "2026-10-31T02:41:27",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "09957e51",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:41:27",
+    "end_time": "2026-11-01T02:41:27",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2f93941b",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:41:28.164364",
+    "end_time": "2026-10-30T04:41:28.164364",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "45dcdf71",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "56a0c22a",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d1e088c7",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:41:44",
+    "end_time": "2026-10-31T02:41:44",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "04104576",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:41:44",
+    "end_time": "2026-11-01T02:41:44",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "77402537",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:41:44.604618",
+    "end_time": "2026-10-30T04:41:44.604618",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "6e75ba16",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "b5548b83",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2b350387",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:47:33",
+    "end_time": "2026-10-31T02:47:33",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "18657abc",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:47:33",
+    "end_time": "2026-11-01T02:47:33",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "a0faa8f3",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:47:33.554291",
+    "end_time": "2026-10-30T04:47:33.554291",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "3bd5d424",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "c9e3b3c0",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "1b47c10c",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:49:49",
+    "end_time": "2026-10-31T02:49:49",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d63de8c0",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:49:49",
+    "end_time": "2026-11-01T02:49:49",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "fb686c39",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:49:50.007522",
+    "end_time": "2026-10-30T04:49:50.007522",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "4b77c9f7",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "c8f8d525",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "9ade7b84",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:57:50",
+    "end_time": "2026-10-31T02:57:50",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2e2caa83",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:57:50",
+    "end_time": "2026-11-01T02:57:50",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "1ef5e229",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:57:50.385431",
+    "end_time": "2026-10-30T04:57:50.385431",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "bd6e8bad",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "694ba49d",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2e85967a",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T01:58:07",
+    "end_time": "2026-10-31T02:58:07",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "0b92d449",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T01:58:07",
+    "end_time": "2026-11-01T02:58:07",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "08493e17",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T03:58:07.964729",
+    "end_time": "2026-10-30T04:58:07.964729",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "5709f35c",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "54e4cd0a",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "39d1a6ad",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T02:01:17",
+    "end_time": "2026-10-31T03:01:17",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "441320ce",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T02:01:17",
+    "end_time": "2026-11-01T03:01:17",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "899a9fef",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T04:01:17.377177",
+    "end_time": "2026-10-30T05:01:17.377177",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "ec035b9e",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "72e7473f",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "467bbad9",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T02:05:14",
+    "end_time": "2026-10-31T03:05:14",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2f9ec45c",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T02:05:14",
+    "end_time": "2026-11-01T03:05:14",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d982c1b2",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T04:05:14.723681",
+    "end_time": "2026-10-30T05:05:14.723681",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "c1f7e721",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "98846fc9",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "3d55fa87",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T02:06:06",
+    "end_time": "2026-10-31T03:06:06",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "ffe17b8a",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T02:06:06",
+    "end_time": "2026-11-01T03:06:06",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "4eda6a80",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T04:06:07.143748",
+    "end_time": "2026-10-30T05:06:07.143748",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "23d57897",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "ef1727a2",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "aa2d93e1",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-10-31T02:12:35",
+    "end_time": "2026-10-31T03:12:35",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "cd7f7d20",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-01T02:12:35",
+    "end_time": "2026-11-01T03:12:35",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "f8d93e45",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-10-30T04:12:36.186375",
+    "end_time": "2026-10-30T05:12:36.186375",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2472ac99",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "e8967ea0",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "6d90faf9",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:18:24",
+    "end_time": "2026-11-03T01:18:24",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "c183925f",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:18:24",
+    "end_time": "2026-11-04T01:18:24",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "1ecaaa4e",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:18:25.449486",
+    "end_time": "2026-11-02T03:18:25.449486",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "6554b0df",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "8c2b81eb",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "bcf381aa",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:30:55",
+    "end_time": "2026-11-03T01:30:55",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "172eca8b",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:30:55",
+    "end_time": "2026-11-04T01:30:55",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "8d7795b4",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:30:55.957970",
+    "end_time": "2026-11-02T03:30:55.957970",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "81b411ae",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "f2bcabab",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "9f63b25c",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:32:51",
+    "end_time": "2026-11-03T01:32:51",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "3b92296a",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:32:51",
+    "end_time": "2026-11-04T01:32:51",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "8a2bae41",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:32:51.537653",
+    "end_time": "2026-11-02T03:32:51.537653",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "035772d0",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "287530a0",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "688b54dd",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:39:59",
+    "end_time": "2026-11-03T01:39:59",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "fbb8347d",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:39:59",
+    "end_time": "2026-11-04T01:39:59",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d4f6ab7d",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:40:00.267167",
+    "end_time": "2026-11-02T03:40:00.267167",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "61dec529",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "694f2a98",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "07ed0cde",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:46:40",
+    "end_time": "2026-11-03T01:46:40",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "1cef703c",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:46:40",
+    "end_time": "2026-11-04T01:46:40",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "d8e0787d",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:46:40.346931",
+    "end_time": "2026-11-02T03:46:40.346931",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "1a5af673",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "24b48aab",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "84292122",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:47:03",
+    "end_time": "2026-11-03T01:47:03",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "c2065782",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:47:03",
+    "end_time": "2026-11-04T01:47:03",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "9ee5a469",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:47:04.078816",
+    "end_time": "2026-11-02T03:47:04.078816",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "cfed9a92",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "1fdf2028",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "5b3bcf78",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:48:08",
+    "end_time": "2026-11-03T01:48:08",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "c4e55382",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:48:08",
+    "end_time": "2026-11-04T01:48:08",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2a212be4",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:48:08.876377",
+    "end_time": "2026-11-02T03:48:08.876377",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "8e234f91",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "3b19912d",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "fef32b24",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:53:20",
+    "end_time": "2026-11-03T01:53:20",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "59cad120",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:53:20",
+    "end_time": "2026-11-04T01:53:20",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "e9721e7b",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:53:20.661250",
+    "end_time": "2026-11-02T03:53:20.661250",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "6f0dcc75",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "35ca1781",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "499fe456",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-03T00:55:41",
+    "end_time": "2026-11-03T01:55:41",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "6c5ad36f",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-04T00:55:41",
+    "end_time": "2026-11-04T01:55:41",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "5dd04cbc",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-02T02:55:41.926360",
+    "end_time": "2026-11-02T03:55:41.926360",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "18761b16",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "893ae2c6",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "ef310e16",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-04T00:26:00",
+    "end_time": "2026-11-04T01:26:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "b3749e48",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-05T00:26:00",
+    "end_time": "2026-11-05T01:26:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "f87afb8c",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-03T02:26:01.231434",
+    "end_time": "2026-11-03T03:26:01.231434",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "0bf2acbf",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "6ab8c50a",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "2df35c25",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-04T00:46:01",
+    "end_time": "2026-11-04T01:46:01",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "0f0847bd",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-05T00:46:01",
+    "end_time": "2026-11-05T01:46:01",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "435e6f41",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-03T02:46:03.639677",
+    "end_time": "2026-11-03T03:46:03.639677",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "11810eca",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "dc8a950e",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "37752469",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-04T00:50:30",
+    "end_time": "2026-11-04T01:50:30",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "3be518a1",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-05T00:50:30",
+    "end_time": "2026-11-05T01:50:30",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "23e75c0d",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-03T02:50:31.352136",
+    "end_time": "2026-11-03T03:50:31.352136",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "764535f4",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "71b89629",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "35aa9419",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-04T00:55:26",
+    "end_time": "2026-11-04T01:55:26",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "18662738",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-05T00:55:26",
+    "end_time": "2026-11-05T01:55:26",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "08df05c6",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-03T02:55:28.156080",
+    "end_time": "2026-11-03T03:55:28.156080",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "bd303868",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "b18dd4f2",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "1ed862aa",
+    "title": "Bulk Sync A",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/bulk-aaa",
+    "start_time": "2026-11-04T00:56:39",
+    "end_time": "2026-11-04T01:56:39",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "92ce62dd",
+    "title": "Bulk Sync B",
+    "platform": "teams",
+    "meeting_url": "https://teams.microsoft.com/bulk-bbb",
+    "start_time": "2026-11-05T00:56:39",
+    "end_time": "2026-11-05T01:56:39",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "c1cfdae9",
+    "title": "Status Transition Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/test-join-status",
+    "start_time": "2026-11-03T02:56:41.574398",
+    "end_time": "2026-11-03T03:56:41.574398",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "68fbae81",
+    "title": "Integration Standup Test",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/abc-defg-hij",
+    "start_time": "2026-10-21T16:00:00",
+    "end_time": "2026-10-21T17:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
+  },
+  {
+    "id": "a841434f",
+    "title": "UTC Timezone Test Meeting",
+    "platform": "google_meet",
+    "meeting_url": "https://meet.google.com/utc-test-xyz",
+    "start_time": "2026-10-21T18:00:00",
+    "end_time": "2026-10-21T19:00:00",
+    "auto_leave": true,
+    "status": "cancelled"
   }
 ]

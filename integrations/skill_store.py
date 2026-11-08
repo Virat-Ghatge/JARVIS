@@ -22,6 +22,18 @@ class SkillStore:
         self._is_teaching: bool = False
         self._current_recording: Optional[Dict[str, Any]] = None
 
+    @property
+    def recording(self) -> bool:
+        return self._is_teaching
+
+    @property
+    def is_recording(self) -> bool:
+        return self._is_teaching
+
+    @property
+    def skill_store(self):
+        return self
+
     def get_skills(self) -> List[Dict[str, Any]]:
         """Retrieve all skills from config/skills.json."""
         with self._lock:
@@ -32,6 +44,9 @@ class SkillStore:
             except Exception as e:
                 print(f"[SkillStore] Error reading {SKILLS_FILE}: {e}")
                 return []
+
+    def list_skills(self) -> List[Dict[str, Any]]:
+        return self.get_skills()
 
     def save_skills(self, skills: List[Dict[str, Any]]) -> bool:
         """Persist skills list to config/skills.json."""
@@ -88,17 +103,21 @@ class SkillStore:
         with self._lock:
             return self._is_teaching
 
-    def start_teach_mode(self, name: str, trigger_phrases: List[str]) -> Dict[str, Any]:
+    def start_teach_mode(self, name: str, trigger_phrases: Optional[List[str]] = None) -> Dict[str, Any]:
         """Initiate a new Teach Mode recording session."""
+        phrases = trigger_phrases or [name]
         with self._lock:
             self._is_teaching = True
             self._current_recording = {
                 "id": f"skill-{uuid.uuid4().hex[:6]}",
                 "name": name.strip(),
-                "trigger_phrases": [t.strip().lower() for t in trigger_phrases if t.strip()],
+                "trigger_phrases": [t.strip().lower() for t in phrases if str(t).strip()],
                 "steps": [],
             }
             return dict(self._current_recording)
+
+    def start_recording(self, name: str, trigger_phrases: Optional[List[str]] = None) -> Dict[str, Any]:
+        return self.start_teach_mode(name=name, trigger_phrases=trigger_phrases)
 
     def record_step(self, command: str) -> bool:
         """Append a command step to the active Teach Mode session."""
@@ -107,6 +126,9 @@ class SkillStore:
                 return False
             self._current_recording["steps"].append(command.strip())
             return True
+
+    def add_step(self, command: str) -> bool:
+        return self.record_step(command)
 
     def stop_teach_mode(self, save: bool = True) -> Optional[Dict[str, Any]]:
         """End Teach Mode session and optionally save to config/skills.json."""
@@ -126,6 +148,10 @@ class SkillStore:
 
         return recorded
 
+    def stop_recording(self, save: bool = True) -> Optional[Dict[str, Any]]:
+        return self.stop_teach_mode(save=save)
+
 
 # Global skill store singleton
 skill_store = SkillStore()
+SkillStore.skill_store = skill_store

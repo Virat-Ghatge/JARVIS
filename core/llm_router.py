@@ -7,15 +7,25 @@ from typing import Dict, Any, List, Optional, Callable
 
 from config.settings import (
     load_vault,
+    get_vault,
     get_active_key,
     rotate_key,
+    rotate_provider_key,
     mark_key_status,
     get_role_target,
     get_custom_endpoint,
     is_internet_connected,
     DEFAULT_PROVIDERS,
+    LOCAL_MODEL_NAME,
+    is_cloud_api_enabled,
+    is_local_endpoint_url,
 )
-from core.adapters.base import extract_json_from_text
+from core.adapters.base import ChatMessage, LLMResponse, BaseLLMAdapter, extract_json_from_text
+from core.adapters.gemini_adapter import GeminiAdapter
+from core.adapters.groq_adapter import GroqAdapter
+from core.adapters.anthropic_adapter import AnthropicAdapter
+from core.adapters.openai_compat import OpenAICompatAdapter
+from core.adapters.local_gguf_adapter import LocalGGUFAdapter
 
 
 class LLMRouter:
@@ -33,6 +43,7 @@ class LLMRouter:
         self.stats: Dict[str, Any] = {
             "total_calls": 0,
             "total_tokens": 0,
+            "total_session_tokens": 0,
             "prompt_tokens": 0,
             "completion_tokens": 0,
             "active_provider": "standby",
@@ -45,8 +56,17 @@ class LLMRouter:
         if callback not in self._telemetry_listeners:
             self._telemetry_listeners.append(callback)
 
-    def _emit_telemetry(self, event_data: Dict[str, Any]) -> None:
-        payload = {**self.stats, **event_data, "timestamp": time.time()}
+    def _emit_telemetry(self, event_data: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
+        payload = dict(self.stats)
+        if event_data:
+            payload.update(event_data)
+        if kwargs:
+            payload.update(kwargs)
+        payload.setdefault("timestamp", time.time())
+        if "total_session_tokens" not in payload:
+            p = int(payload.get("prompt_tokens", 0) or 0)
+            c = int(payload.get("completion_tokens", 0) or 0)
+            payload["total_session_tokens"] = p + c
         for cb in list(self._telemetry_listeners):
             try:
                 cb(payload)
@@ -67,59 +87,127 @@ class LLMRouter:
     def _build_candidate_chain(self, role: str, preferred_provider: Optional[str] = None, preferred_model: Optional[str] = None) -> List[Dict[str, Any]]:
         vault = load_vault(vault_path=self.vault_path)
         candidates: List[Dict[str, Any]] = []
+        local_first = bool(vault.get("local_first_mode", True))
+        cloud_enabled = is_cloud_api_enabled(vault_path=self.vault_path)
 
-        # 1. Explicit override or configured role target
-        if preferred_provider:
-            ep = get_custom_endpoint(preferred_provider, vault_path=self.vault_path)
-            if ep:
-                candidates.append({
-                    "provider": f"custom:{ep['id']}",
-                    "model": preferred_model or ep.get("default_model", "default"),
-                    "base_url": ep.get("base_url"),
-                    "api_key": ep.get("api_key", "sk-local"),
+        compat_defaults = {
+            "openrouter": "https://openrouter.ai/api/v1",
+            "ollama": "http://127.0.0.1:11434/v1",
+            "lmstudio": "http://127.0.0.1:1234/v1",
+            "lm_studio": "http://127.0.0.1:1234/v1",
+            "deepseek": "https://api.deepseek.com/v1",
+        }
+
+        local_cfg = vault.get("providers", {}).get("local", {})
+        local_cand = {
+            "provider": "local",
+            "model": (local_cfg.get("default_model") if isinstance(local_cfg, dict) else None) or LOCAL_MODEL_NAME,
+            "base_url": None,
+            "api_key": "local-in-process",
+            "is_custom": False,
+        }
+
+        def is_cloud_cand(candidate: Dict[str, Any]) -> bool:
+            p_name = str(candidate.get("provider", "")).strip().lower()
+            if p_name == "local":
+                return False
+            if p_name.startswith("custom:") or candidate.get("is_custom"):
+                b_url = str(candidate.get("base_url") or "")
+                return not is_local_endpoint_url(b_url)
+            return True
+
+        def append_candidate(candidate: Optional[Dict[str, Any]]) -> None:
+            if not candidate:
+                return
+            if not cloud_enabled and is_cloud_cand(candidate):
+                return
+            provider_name = str(candidate.get("provider", "")).strip().lower()
+            if not provider_name:
+                return
+            if not any(str(item.get("provider", "")).lower() == provider_name for item in candidates):
+                candidates.append(candidate)
+
+        def provider_candidate(provider_name: str, model_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+            clean_provider = str(provider_name or "").strip().lower()
+            if clean_provider == "local":
+                candidate = dict(local_cand)
+                if model_name:
+                    candidate["model"] = model_name
+                return candidate
+
+            endpoint = get_custom_endpoint(clean_provider, vault_path=self.vault_path)
+            if endpoint and endpoint.get("enabled", True):
+                return {
+                    "provider": f"custom:{endpoint['id']}",
+                    "model": model_name or endpoint.get("default_model") or endpoint.get("model") or "default",
+                    "base_url": endpoint.get("base_url"),
+                    "api_key": endpoint.get("api_key", "sk-local"),
                     "is_custom": True,
-                })
-            else:
-                k = get_active_key(preferred_provider, vault_path=self.vault_path)
-                if k:
-                    prov_cfg = vault.get("providers", {}).get(preferred_provider.lower(), {})
-                    candidates.append({
-                        "provider": preferred_provider.lower(),
-                        "model": preferred_model or prov_cfg.get("default_model", "gemini-2.5-flash"),
-                        "base_url": None,
-                        "api_key": k,
-                        "is_custom": False,
-                    })
+                }
+
+            prov_cfg = vault.get("providers", {}).get(clean_provider, {})
+            if not isinstance(prov_cfg, dict):
+                prov_cfg = {}
+            active_key = get_active_key(clean_provider, vault_path=self.vault_path)
+            if not active_key:
+                return None
+            return {
+                "provider": clean_provider,
+                "model": model_name or prov_cfg.get("default_model") or DEFAULT_PROVIDERS.get(clean_provider, {}).get("default_model", "default"),
+                "base_url": prov_cfg.get("base_url") or compat_defaults.get(clean_provider),
+                "api_key": active_key,
+                "is_custom": False,
+            }
+
+        # An explicit provider is an operator override and must be tried first.
+        if preferred_provider:
+            append_candidate(provider_candidate(str(preferred_provider), preferred_model))
+
+        # Local-first mode applies to conversational roles only. The local
+        # candidate is still inserted immediately after an explicit/role
+        # target in cloud-first mode so a broken cloud connection fails over
+        # to the embedded model before trying unrelated providers.
+        conversational_role = role in ("chat", "qa_chat")
+        if local_first and not preferred_provider and conversational_role:
+            append_candidate(dict(local_cand))
 
         primary = get_role_target(role, vault_path=self.vault_path)
-        if primary.get("api_key") or primary.get("is_custom"):
-            if not any(c["provider"] == primary["provider"] for c in candidates):
-                candidates.append(dict(primary))
+        if primary.get("provider") == "local":
+            append_candidate(provider_candidate("local", primary.get("model")))
+        elif primary.get("api_key") or primary.get("is_custom"):
+            append_candidate({
+                "provider": primary.get("provider"),
+                "model": primary.get("model") or "default",
+                "base_url": primary.get("base_url"),
+                "api_key": primary.get("api_key"),
+                "is_custom": bool(primary.get("is_custom")),
+            })
 
-        # 2. Add all other providers that have keys configured as automatic fallbacks
-        for prov_name, prov_cfg in vault.get("providers", {}).items():
-            k = get_active_key(prov_name, vault_path=self.vault_path)
-            if k and not any(c["provider"] == prov_name for c in candidates):
-                candidates.append({
-                    "provider": prov_name,
-                    "model": prov_cfg.get("default_model", DEFAULT_PROVIDERS.get(prov_name, {}).get("default_model", "default")),
-                    "base_url": None,
-                    "api_key": k,
-                    "is_custom": False,
+        if not local_first and conversational_role:
+            append_candidate(dict(local_cand))
+
+        # Add all other configured providers as fallbacks. Their configured
+        # base_url is preserved for OpenAI-compatible providers such as
+        # Ollama, LM Studio, OpenRouter, and DeepSeek.
+        for prov_name in vault.get("providers", {}).keys():
+            if str(prov_name).lower() in ("custom_endpoints", "local"):
+                continue
+            append_candidate(provider_candidate(str(prov_name)))
+
+        # Finally add enabled custom endpoints that are not already bound.
+        for endpoint in vault.get("custom_endpoints", []):
+            if endpoint.get("enabled", True):
+                append_candidate({
+                    "provider": f"custom:{endpoint['id']}",
+                    "model": endpoint.get("default_model") or endpoint.get("model") or "default",
+                    "base_url": endpoint.get("base_url"),
+                    "api_key": endpoint.get("api_key", "sk-local"),
+                    "is_custom": True,
                 })
 
-        # 3. Add enabled custom endpoints as fallback
-        for ep in vault.get("custom_endpoints", []):
-            if ep.get("enabled", True):
-                cid = f"custom:{ep['id']}"
-                if not any(c["provider"] == cid or c["provider"] == ep["id"] for c in candidates):
-                    candidates.append({
-                        "provider": cid,
-                        "model": ep.get("default_model") or ep.get("model") or "default",
-                        "base_url": ep.get("base_url"),
-                        "api_key": ep.get("api_key", "sk-local"),
-                        "is_custom": True,
-                    })
+        # The embedded model is always the final safety net, including for
+        # non-conversational roles whose cloud provider is unavailable.
+        append_candidate(dict(local_cand))
 
         return candidates
 
@@ -326,6 +414,148 @@ class LLMRouter:
             err_body = he.read().decode("utf-8", errors="ignore")
             raise RuntimeError(f"HTTP {he.code}: {err_body}") from he
 
+    def _resolve_model(self, provider: str, model: Optional[str]) -> str:
+        if model and model != "default" and str(model).strip():
+            return str(model).strip()
+        endpoint = get_custom_endpoint(provider, vault_path=self.vault_path)
+        if endpoint:
+            return str(endpoint.get("default_model") or endpoint.get("model") or "default")
+        provider_config = load_vault(vault_path=self.vault_path).get("providers", {}).get(str(provider).lower(), {})
+        if isinstance(provider_config, dict) and provider_config.get("default_model"):
+            return str(provider_config["default_model"])
+        defaults = {
+            "local": LOCAL_MODEL_NAME,
+            "gemini": "gemini-2.5-flash",
+            "groq": "llama-3.3-70b-versatile",
+            "anthropic": "claude-3-5-sonnet-latest",
+            "openai": "gpt-4o-mini",
+        }
+        return defaults.get(str(provider).lower(), "gemini-2.5-flash")
+
+    def get_adapter_for_provider(
+        self,
+        provider: str,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ) -> BaseLLMAdapter:
+        clean_prov = str(provider).strip().lower()
+        prov_key = api_key if api_key is not None else get_active_key(clean_prov, vault_path=self.vault_path)
+        resolved_model = self._resolve_model(clean_prov, model)
+
+        if clean_prov == "local":
+            return LocalGGUFAdapter(model=resolved_model)
+        elif clean_prov == "gemini":
+            return GeminiAdapter(api_key=prov_key or "", model=resolved_model)
+        elif clean_prov == "groq":
+            return GroqAdapter(api_key=prov_key or "", model=resolved_model)
+        elif clean_prov == "anthropic":
+            return AnthropicAdapter(api_key=prov_key or "", model=resolved_model)
+
+        ep = get_custom_endpoint(provider, vault_path=self.vault_path)
+        if ep:
+            ep_model = resolved_model if (model and model != "default") else (ep.get("model") or "gpt-4o-mini")
+            return OpenAICompatAdapter(
+                base_url=base_url or ep.get("base_url", "https://api.openai.com/v1"),
+                api_key=prov_key or ep.get("api_key", ""),
+                model=ep_model,
+                provider_name=ep.get("name", "custom"),
+            )
+
+        provider_cfg = load_vault(vault_path=self.vault_path).get("providers", {}).get(clean_prov, {})
+        configured_base_url = provider_cfg.get("base_url") if isinstance(provider_cfg, dict) else None
+        compat_defaults = {
+            "openrouter": "https://openrouter.ai/api/v1",
+            "ollama": "http://127.0.0.1:11434/v1",
+            "lmstudio": "http://127.0.0.1:1234/v1",
+            "lm_studio": "http://127.0.0.1:1234/v1",
+            "deepseek": "https://api.deepseek.com/v1",
+        }
+        return OpenAICompatAdapter(
+            base_url=base_url or configured_base_url or compat_defaults.get(clean_prov, "https://api.openai.com/v1"),
+            api_key=prov_key or "",
+            model=resolved_model,
+            provider_name=clean_prov,
+        )
+
+    def is_retryable_error(self, error_str: Optional[str]) -> bool:
+        if not error_str:
+            return False
+        err_lower = error_str.lower()
+        retry_signatures = [
+            "429",
+            "rate limit",
+            "quota",
+            "resource_exhausted",
+            "too many requests",
+            "unauthorized",
+            "invalid api key",
+            "authentication",
+            "401",
+        ]
+        return any(sig in err_lower for sig in retry_signatures)
+
+    def generate_with_failover(
+        self,
+        provider: str,
+        model: str,
+        messages: List[ChatMessage],
+        temperature: float = 0.7,
+        max_tokens: int = 1024,
+        json_mode: bool = False,
+    ) -> LLMResponse:
+        vault = load_vault(vault_path=self.vault_path)
+        prov_data = vault.get("providers", {}).get(provider, {})
+        keys = prov_data.get("keys", [])
+        max_attempts = max(1, len(keys))
+        last_response = None
+
+        for attempt in range(max_attempts):
+            adapter = self.get_adapter_for_provider(provider, model)
+            response = adapter.generate(
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                json_mode=json_mode,
+            )
+            last_response = response
+
+            if not response.error:
+                tok_total = response.total_tokens or (response.prompt_tokens + response.completion_tokens)
+                with self._lock:
+                    self.stats["total_session_tokens"] = int(self.stats.get("total_session_tokens", 0)) + tok_total
+                self._emit_telemetry({
+                    "provider": provider,
+                    "model": model,
+                    "latency_ms": response.latency_ms,
+                    "prompt_tokens": response.prompt_tokens,
+                    "completion_tokens": response.completion_tokens,
+                    "total_session_tokens": tok_total,
+                })
+                return response
+
+            if self.is_retryable_error(response.error) and len(keys) > 1 and attempt < max_attempts - 1:
+                new_key = rotate_key(provider, reason=response.error, vault_path=self.vault_path)
+                with self._lock:
+                    self.stats["key_rotations"] = int(self.stats.get("key_rotations", 0)) + 1
+                continue
+            else:
+                break
+
+        if last_response:
+            tok_total = last_response.total_tokens or (last_response.prompt_tokens + last_response.completion_tokens)
+            self._emit_telemetry({
+                "provider": provider,
+                "model": model,
+                "latency_ms": last_response.latency_ms,
+                "prompt_tokens": last_response.prompt_tokens,
+                "completion_tokens": last_response.completion_tokens,
+                "total_session_tokens": tok_total,
+            })
+            return last_response
+
+        return LLMResponse(text="", error="Unknown generation failure", provider=provider, model=model)
+
     def chat(
         self,
         messages: Any,
@@ -344,7 +574,24 @@ class LLMRouter:
         else:
             norm_messages = [{"role": "user", "content": str(messages)}]
 
+        cloud_enabled = is_cloud_api_enabled(vault_path=self.vault_path)
         candidates = self._build_candidate_chain(role=role, preferred_provider=provider, preferred_model=model)
+        if not cloud_enabled:
+            has_local = any(
+                str(c.get("provider", "")).lower() == "local" or
+                (bool(c.get("is_custom")) and is_local_endpoint_url(str(c.get("base_url", ""))))
+                for c in candidates
+            )
+            if not has_local or not candidates:
+                clean_offline_msg = "Cloud AI API is disabled (Offline Mode). All local OS controls, music, alarms, and search remain active, sir."
+                return {
+                    "content": clean_offline_msg,
+                    "text": clean_offline_msg,
+                    "provider": "offline",
+                    "model": "none",
+                    "status": "offline",
+                    "success": False,
+                }
         if not candidates:
             msg = (
                 "No LLM API keys or custom endpoints are configured in the API Vault yet. "
@@ -392,6 +639,27 @@ class LLMRouter:
                             system_prompt=system_prompt,
                             temperature=temperature,
                         )
+                    elif prov_name == "local":
+                        local_adapter = self.get_adapter_for_provider("local", model=model_name)
+                        chat_msgs = []
+                        if system_prompt:
+                            chat_msgs.append(ChatMessage(role="system", content=system_prompt))
+                        for m in norm_messages:
+                            chat_msgs.append(ChatMessage(role=m.get("role", "user"), content=str(m.get("content", ""))))
+                        res_obj = local_adapter.generate(
+                            messages=chat_msgs,
+                            temperature=temperature,
+                            max_tokens=1024,
+                            json_mode=json_mode,
+                        )
+                        if res_obj.error:
+                            raise RuntimeError(res_obj.error)
+                        res = {
+                            "content": res_obj.text,
+                            "model": res_obj.model or model_name,
+                            "prompt_tokens": res_obj.prompt_tokens,
+                            "completion_tokens": res_obj.completion_tokens,
+                        }
                     elif prov_name == "gemini":
                         res = self._call_gemini(
                             api_key=curr_key,
@@ -438,7 +706,7 @@ class LLMRouter:
                         )
 
                     latency_ms = int((time.time() - t0) * 1000)
-                    if not is_custom:
+                    if not is_custom and prov_name != "local":
                         mark_key_status(prov_name, curr_key, "active", vault_path=self.vault_path)
 
                     p_tok = int(res.get("prompt_tokens", 0))
@@ -448,6 +716,7 @@ class LLMRouter:
                         self.stats["prompt_tokens"] += p_tok
                         self.stats["completion_tokens"] += c_tok
                         self.stats["total_tokens"] += p_tok + c_tok
+                        self.stats["total_session_tokens"] += p_tok + c_tok
                         self.stats["active_provider"] = prov_name
                         self.stats["active_model"] = res.get("model", model_name)
                         self.stats["last_latency_ms"] = latency_ms
@@ -480,7 +749,7 @@ class LLMRouter:
                 except Exception as exc:
                     err_str = str(exc)
                     errors_log.append(f"{prov_name} ({model_name}): {err_str}")
-                    if not is_custom:
+                    if not is_custom and prov_name != "local" and self.is_retryable_error(err_str):
                         rotate_key(prov_name, reason=err_str, vault_path=self.vault_path)
                         with self._lock:
                             self.stats["key_rotations"] += 1
@@ -491,6 +760,18 @@ class LLMRouter:
                         "status": "error",
                         "error": err_str[:200],
                     })
+
+        if not cloud_enabled:
+            clean_offline_msg = "Cloud AI API is disabled (Offline Mode). All local OS controls, music, alarms, and search remain active, sir."
+            return {
+                "content": clean_offline_msg,
+                "text": clean_offline_msg,
+                "provider": "offline",
+                "model": "none",
+                "status": "offline",
+                "success": False,
+                "error": "cloud_api_disabled",
+            }
 
         err_summary = " | ".join(errors_log[-3:]) if errors_log else "Unknown LLM error"
         fail_msg = f"All configured LLM providers failed to respond. Details: {err_summary}"
@@ -503,24 +784,51 @@ class LLMRouter:
             "error": err_summary,
         }
 
+    def query_text(
+        self,
+        arg1: str = "",
+        arg2: Optional[str] = None,
+        role: str = "chat",
+        system_prompt: Optional[str] = None,
+        **kwargs: Any,
+    ) -> str:
+        if arg2 is not None:
+            resolved_role = arg1 or role
+            resolved_prompt = arg2
+        else:
+            resolved_prompt = arg1
+            resolved_role = role or "chat"
+
+        if not resolved_prompt and "prompt" in kwargs:
+            resolved_prompt = kwargs.pop("prompt")
+        if "role" in kwargs:
+            resolved_role = kwargs.pop("role")
+
+        res = self.chat(
+            messages=[{"role": "user", "content": resolved_prompt}],
+            role=resolved_role,
+            system_prompt=system_prompt,
+            **kwargs,
+        )
+        return str(res.get("content", res.get("text", "")))
+
     def generate(
         self,
-        prompt: str,
+        prompt: str = "",
         role: str = "chat",
         system_prompt: Optional[str] = None,
         image_b64: Optional[str] = None,
         json_mode: bool = False,
         **kwargs: Any,
     ) -> str:
-        res = self.chat(
-            messages=[{"role": "user", "content": prompt}],
+        return self.query_text(
+            arg1=prompt,
             role=role,
             system_prompt=system_prompt,
             image_b64=image_b64,
             json_mode=json_mode,
             **kwargs,
         )
-        return str(res.get("content", ""))
 
     def route_and_respond(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         return self.chat(messages=[{"role": "user", "content": prompt}], role="chat", system_prompt=system_prompt)

@@ -101,11 +101,13 @@ class SOMVision:
 
         return annotated, b64_str
 
-    def capture_and_annotate(self, elements: List[Dict[str, Any]]) -> Tuple[Image.Image, str]:
+    def capture_and_annotate(self, elements: Optional[List[Dict[str, Any]]] = None) -> Tuple[Image.Image, str]:
         """Convenience method: capture screen and overlay SoM boxes in one call."""
         img = self.capture_screen()
-        return self.render_som(img, elements)
+        return self.render_som(img, elements or [])
 
 
-# Global SoM vision instance
+# Global SoM vision instance & class aliases
+SetOfMarkVision = SOMVision
+SoMVision = SOMVision
 som_vision = SOMVision()

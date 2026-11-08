@@ -11,3 +11,9 @@ node_modules/
 *.bundle
 *.log
 .DS_Store
+models/*.gguf
+!models/intent_model.onnx
+!models/intent_vocab.json
+*.gguf
+.agents/state/
+

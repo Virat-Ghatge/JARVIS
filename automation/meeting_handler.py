@@ -12,6 +12,7 @@ Follows the same pattern as AlarmHandler, WeatherHandler, etc.:
 import re
 import threading
 import webbrowser
+from typing import Optional, Any
 from datetime import datetime, timedelta
 
 # Import meeting sub-modules
@@ -28,7 +29,7 @@ except ImportError:
 class MeetingHandler:
     """Handles meeting-related voice commands and manages all meeting subsystems."""
 
-    def __init__(self, jarvis):
+    def __init__(self, jarvis: Optional[Any] = None):
         self.jarvis = jarvis
 
         # ── Subsystems ────────────────────────────
@@ -270,3 +271,7 @@ class MeetingHandler:
         self.scheduler.shutdown()
         if self.bot:
             self.bot.close()
+
+
+# Module-level singleton
+meeting_handler = MeetingHandler()

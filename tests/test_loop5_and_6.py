@@ -28,6 +28,10 @@ class TestLoop5And6(unittest.TestCase):
     def setUpClass(cls):
         cls.client = TestClient(app)
 
+    def setUp(self):
+        if not hasattr(self, "client") or self.client is None:
+            self.client = getattr(self.__class__, "client", None) or TestClient(app)
+
     def test_ui_dist_bundle_exists(self):
         """Verify React build output exists on disk with HTML and JS/CSS assets."""
         self.assertTrue(UI_DIST_DIR.exists(), "ui/dist directory does not exist")
@@ -52,6 +56,11 @@ class TestLoop5And6(unittest.TestCase):
         res = self.client.get("/settings/vault")
         self.assertEqual(res.status_code, 200)
         self.assertIn("text/html", res.headers.get("content-type", ""))
+
+    def test_fastapi_spa_missing_asset_returns_404(self):
+        """Verify missing files in assets/ return 404 rather than index.html (to prevent MIME type errors)."""
+        res = self.client.get("/assets/nonexistent_bundle_12345.js")
+        self.assertEqual(res.status_code, 404)
 
     def test_backend_api_vault_endpoint(self):
         """Verify /api/vault returns masked vault structure."""
@@ -502,7 +511,94 @@ class TestLoop5And6(unittest.TestCase):
             if m["title"] in ("Bulk Sync A", "Bulk Sync B"):
                 self.client.delete(f"/api/meetings/{m['id']}")
 
+    def test_websocket_initial_state_contract(self):
+        """Verify WebSocket handshake sends initial AUDIO_STATE, MEETING_STATE, and SYSTEM_TELEMETRY with payload and data keys."""
+        import json
+        with self.client.websocket_connect("/ws") as websocket:
+            msg1_raw = websocket.receive_text()
+            msg1 = json.loads(msg1_raw)
+            self.assertEqual(msg1.get("type"), "AUDIO_STATE")
+            self.assertIn("payload", msg1)
+            self.assertIn("data", msg1)
+            self.assertIn("mic_active", msg1["payload"])
+            self.assertIn("tts_active", msg1["payload"])
+
+            msg2_raw = websocket.receive_text()
+            msg2 = json.loads(msg2_raw)
+            self.assertEqual(msg2.get("type"), "MEETING_STATE")
+            self.assertIn("payload", msg2)
+            self.assertIn("data", msg2)
+
+            msg3_raw = websocket.receive_text()
+            msg3 = json.loads(msg3_raw)
+            self.assertEqual(msg3.get("type"), "SYSTEM_TELEMETRY")
+            self.assertIn("payload", msg3)
+            self.assertIn("data", msg3)
+            self.assertIn("cpu", msg3["payload"])
+            self.assertIn("ram", msg3["payload"])
+            self.assertIn("online", msg3["payload"])
+            self.assertIn("token_stats", msg3["payload"])
+
+    def test_ui_build_stale_detection(self):
+        """Verify main._is_ui_build_stale properly detects valid and stale builds."""
+        import main
+        self.assertFalse(main._is_ui_build_stale())
+
+    def test_main_server_ready_and_wait_probe(self):
+        """Verify is_server_ready and wait_for_server_ready probing behavior."""
+        import main
+        from unittest.mock import patch, MagicMock
+
+        # When server returns 200, is_server_ready is True
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.__enter__.return_value = mock_resp
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            self.assertTrue(main.is_server_ready("127.0.0.1", 5050))
+            self.assertTrue(main.wait_for_server_ready("127.0.0.1", 5050, max_wait_sec=0.5))
+
+        # When server raises error and port is not listening, wait_for_server_ready returns False
+        with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
+            self.assertFalse(main.is_server_ready("127.0.0.1", 9999))
+            self.assertFalse(main.wait_for_server_ready("127.0.0.1", 9999, max_wait_sec=0.2))
+
+        # When backend process dies prematurely, wait_for_server_ready exits False immediately
+        mock_dead_proc = MagicMock()
+        mock_dead_proc.poll.return_value = 1
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            self.assertFalse(main.wait_for_server_ready("127.0.0.1", 5050, max_wait_sec=5.0, proc=mock_dead_proc))
+
+    def test_launch_hud_app_window_fallback_when_no_chromium(self):
+        """Verify launch_hud_app_window falls back gracefully to webbrowser.open when no Chromium binary exists."""
+        import main
+        from unittest.mock import patch
+
+        with patch("main.find_chromium_binary", return_value=None), \
+             patch("webbrowser.open") as mock_webbrowser:
+            proc = main.launch_hud_app_window("http://127.0.0.1:5050")
+            self.assertIsNone(proc)
+            mock_webbrowser.assert_called_once_with("http://127.0.0.1:5050")
+
+    def test_find_chromium_binary_darwin_detection(self):
+        """Verify find_chromium_binary finds Chromium application paths under darwin."""
+        import main
+        from unittest.mock import patch
+
+        with patch("sys.platform", "darwin"), \
+             patch("os.path.isfile", side_effect=lambda p: p == "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
+            found = main.find_chromium_binary()
+            self.assertEqual(found, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+
+    def test_spa_root_serves_html_with_root_container(self):
+        """Verify GET / serves index.html with the #root mount div and script tag."""
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/html", res.headers.get("content-type", ""))
+        self.assertIn('<div id="root"></div>', res.text)
+        self.assertIn("/assets/", res.text)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
 

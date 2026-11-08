@@ -1,4 +1,12 @@
+import os
+import sys
+from pathlib import Path
 import unittest
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 from config.settings import is_local_endpoint_url, is_internet_connected
 from agent_os.os_actuator import OSActuator
 from audio.voice_listener import VoiceListener

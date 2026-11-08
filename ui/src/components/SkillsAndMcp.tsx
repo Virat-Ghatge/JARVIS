@@ -224,12 +224,18 @@ export const SkillsAndMcp: React.FC<SkillsAndMcpProps> = ({ apiBase }) => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input
+              id="teach-routine-name"
+              name="teachRoutineName"
+              autoComplete="off"
               className={inputClasses}
               placeholder="New Routine Name (e.g. Morning Briefing)"
               value={teachName}
               onChange={(e) => setTeachName(e.target.value)}
             />
             <input
+              id="teach-trigger-phrase"
+              name="teachTriggerPhrase"
+              autoComplete="off"
               className={inputClasses}
               placeholder="Voice trigger phrase (e.g. start morning briefing)"
               value={teachTrigger}
@@ -267,9 +273,11 @@ export const SkillsAndMcp: React.FC<SkillsAndMcpProps> = ({ apiBase }) => {
         {/* New skill form */}
         {showNewSkill && (
           <div className="bg-void/40 border border-cyber/50 rounded p-3 space-y-2">
-            <input className={inputClasses} placeholder="Skill Name (e.g. Morning Routine)" value={newSkillName} onChange={(e) => setNewSkillName(e.target.value)} />
-            <input className={inputClasses} placeholder="Voice trigger phrase (optional, comma-separated)" value={newSkillTrigger} onChange={(e) => setNewSkillTrigger(e.target.value)} />
+            <input id="new-skill-name" name="newSkillName" autoComplete="off" className={inputClasses} placeholder="Skill Name (e.g. Morning Routine)" value={newSkillName} onChange={(e) => setNewSkillName(e.target.value)} />
+            <input id="new-skill-trigger" name="newSkillTrigger" autoComplete="off" className={inputClasses} placeholder="Voice trigger phrase (optional, comma-separated)" value={newSkillTrigger} onChange={(e) => setNewSkillTrigger(e.target.value)} />
             <textarea
+              id="new-skill-steps"
+              name="newSkillSteps"
               className={`${inputClasses} h-20 resize-none`}
               placeholder="Commands (one per line):&#10;open spotify&#10;set volume to 30&#10;what is the weather"
               value={newSkillSteps}
@@ -348,9 +356,9 @@ export const SkillsAndMcp: React.FC<SkillsAndMcpProps> = ({ apiBase }) => {
 
         {showNewMcp && (
           <div className="bg-void/40 border border-cyber/50 rounded p-3 space-y-2">
-            <input className={inputClasses} placeholder="Server Name" value={newMcpName} onChange={(e) => setNewMcpName(e.target.value)} />
-            <input className={inputClasses} placeholder="Command (e.g. npx -y @mcp/server)" value={newMcpCommand} onChange={(e) => setNewMcpCommand(e.target.value)} />
-            <input className={inputClasses} placeholder="URL (for HTTP transport)" value={newMcpUrl} onChange={(e) => setNewMcpUrl(e.target.value)} />
+            <input id="new-mcp-name" name="newMcpName" autoComplete="off" className={inputClasses} placeholder="Server Name" value={newMcpName} onChange={(e) => setNewMcpName(e.target.value)} />
+            <input id="new-mcp-command" name="newMcpCommand" autoComplete="off" className={inputClasses} placeholder="Command (e.g. npx -y @mcp/server)" value={newMcpCommand} onChange={(e) => setNewMcpCommand(e.target.value)} />
+            <input id="new-mcp-url" name="newMcpUrl" autoComplete="off" className={inputClasses} placeholder="URL (for HTTP transport)" value={newMcpUrl} onChange={(e) => setNewMcpUrl(e.target.value)} />
             <div className="flex items-center space-x-2">
               <button onClick={addMcpServer} className="px-3 py-1.5 rounded bg-cyan-arc/10 border border-cyan-arc/30 text-xs text-cyan-arc hover:bg-cyan-arc/20 transition-colors">
                 Add Server

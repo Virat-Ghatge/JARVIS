@@ -61,8 +61,8 @@ export const SystemAndAlarms: React.FC<SystemAndAlarmsProps> = ({ apiBase }) => 
     try {
       const res = await fetch(`${apiBase}/api/alarms`);
       const data: AlarmsData = await res.json();
-      setAlarms(data.alarms || []);
-      setTimers(data.timers || []);
+      setAlarms(data?.alarms || []);
+      setTimers(data?.timers || []);
     } catch { /* offline */ }
   }, [apiBase]);
 
@@ -74,7 +74,7 @@ export const SystemAndAlarms: React.FC<SystemAndAlarmsProps> = ({ apiBase }) => 
       try {
         const res = await fetch(`${apiBase}/api/vault`);
         const data = await res.json();
-        if (data.workspace_path) {
+        if (data?.workspace_path) {
           setWorkspacePath(data.workspace_path);
         }
       } catch { /* offline */ }
@@ -207,6 +207,8 @@ export const SystemAndAlarms: React.FC<SystemAndAlarmsProps> = ({ apiBase }) => 
             <span className="text-[11px] text-cyan-arc font-mono">{volume}%</span>
           </div>
           <input
+            id="system-volume-range"
+            name="systemVolumeRange"
             type="range" min="0" max="100" value={volume}
             onChange={(e) => setSystemVolume(Number(e.target.value))}
             className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
@@ -223,6 +225,8 @@ export const SystemAndAlarms: React.FC<SystemAndAlarmsProps> = ({ apiBase }) => 
             <span className="text-[11px] text-gold-reactor font-mono">{brightness}%</span>
           </div>
           <input
+            id="system-brightness-range"
+            name="systemBrightnessRange"
             type="range" min="0" max="100" value={brightness}
             onChange={(e) => setSystemBrightness(Number(e.target.value))}
             className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
@@ -265,8 +269,10 @@ export const SystemAndAlarms: React.FC<SystemAndAlarmsProps> = ({ apiBase }) => 
 
         {/* Add alarm */}
         <div className="flex items-center space-x-2">
-          <input className={inputClasses} placeholder="Alarm label" value={newAlarmLabel} onChange={(e) => setNewAlarmLabel(e.target.value)} />
+          <input id="alarm-label-input" name="alarmLabelInput" autoComplete="off" className={inputClasses} placeholder="Alarm label" value={newAlarmLabel} onChange={(e) => setNewAlarmLabel(e.target.value)} />
           <input
+            id="alarm-time-input"
+            name="alarmTimeInput"
             type="time"
             className={`${inputClasses} w-32`}
             value={newAlarmTime}
@@ -279,8 +285,10 @@ export const SystemAndAlarms: React.FC<SystemAndAlarmsProps> = ({ apiBase }) => 
 
         {/* Add countdown timer */}
         <div className="flex items-center space-x-2">
-          <input className={inputClasses} placeholder="Timer label" value={newTimerLabel} onChange={(e) => setNewTimerLabel(e.target.value)} />
+          <input id="timer-label-input" name="timerLabelInput" autoComplete="off" className={inputClasses} placeholder="Timer label" value={newTimerLabel} onChange={(e) => setNewTimerLabel(e.target.value)} />
           <input
+            id="timer-minutes-input"
+            name="timerMinutesInput"
             type="number"
             min="1"
             placeholder="Min"
@@ -368,6 +376,9 @@ export const SystemAndAlarms: React.FC<SystemAndAlarmsProps> = ({ apiBase }) => 
         </div>
         <div className="flex items-center space-x-2">
           <input
+            id="workspace-path-input"
+            name="workspacePathInput"
+            autoComplete="off"
             className={inputClasses}
             placeholder="Workspace folder path (e.g. D:\Projects\MyApp)"
             value={workspacePath}

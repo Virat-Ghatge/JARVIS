@@ -4,6 +4,30 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 
+class ContextMessage(dict):
+    """
+    Hybrid message object supporting both attribute access (.role, .content)
+    and dict key access (['role'], ['content'], .get('role')).
+    """
+    def __init__(self, role: str, content: str, **kwargs):
+        super().__init__(role=role, content=content, **kwargs)
+        self.role = role
+        self.content = content
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in ("role", "content"):
+            super().__setattr__(name, value)
+            self[name] = value
+        else:
+            self[name] = value
+
+
 class ContextManager:
     """
     Multi-turn conversation memory manager with real-time 2026 clock & date
@@ -19,8 +43,16 @@ class ContextManager:
         self.max_turns = max_turns
         self.max_messages = max_messages or (max_turns * 2)
         self._custom_system_prompt = system_prompt
-        self.history: List[Dict[str, Any]] = []
+        self.history: List[ContextMessage] = []
         self._lock = threading.RLock()
+
+    @property
+    def _history(self) -> List[ContextMessage]:
+        return self.history
+
+    @_history.setter
+    def _history(self, val: List[Any]) -> None:
+        self.history = val
 
     def get_system_prompt(self, extra_context: Optional[str] = None) -> str:
         now = datetime.now()
@@ -33,56 +65,57 @@ class ContextManager:
             "When writing code, provide complete, runnable implementations."
         )
         temporal_anchor = (
-            f"\n[REAL-TIME SYSTEM CLOCK]: Current Date & Time is {current_dt_str} (Year: {current_year}). "
-            f"Never assume the year is 2024; always use {current_year} for current events and schedules."
+            f"\n[REAL-TIME SYSTEM CLOCK]: Current Date & Time is {current_dt_str} (Current Year: {current_year}). "
+            f"Never assume the year is 2024; always use {current_year} for current events and schedules. "
+            "CRITICAL RULE: Never say 'Let me check that for you'."
         )
         full_prompt = f"{base}{temporal_anchor}"
         if extra_context:
             full_prompt += f"\n\n{extra_context}"
         return full_prompt
 
-    def add_message(self, role: str, content: str, **meta: Any) -> Dict[str, Any]:
+    def add_message(self, role: str, content: str, **meta: Any) -> ContextMessage:
         norm_role = "assistant" if role in ("assistant", "model", "jarvis", "bot") else (
             "system" if role == "system" else "user"
         )
-        entry: Dict[str, Any] = {
-            "role": norm_role,
-            "content": str(content),
-            "timestamp": datetime.now().isoformat(),
-        }
-        if meta:
-            entry.update(meta)
+        entry = ContextMessage(
+            role=norm_role,
+            content=str(content),
+            timestamp=datetime.now().isoformat(),
+            **meta
+        )
         with self._lock:
             self.history.append(entry)
             if len(self.history) > self.max_messages:
                 self.history = self.history[-self.max_messages:]
         return entry
 
-    def add_user_message(self, content: str) -> Dict[str, Any]:
+    def add_user_message(self, content: str) -> ContextMessage:
         return self.add_message("user", content)
 
-    def add_assistant_message(self, content: str) -> Dict[str, Any]:
+    def add_assistant_message(self, content: str) -> ContextMessage:
         return self.add_message("assistant", content)
 
     def add_turn(self, user_input: str, assistant_reply: str) -> None:
         self.add_message("user", user_input)
         self.add_message("assistant", assistant_reply)
 
-    def get_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_history(self, limit: Optional[int] = None) -> List[ContextMessage]:
         with self._lock:
             items = list(self.history)
         if limit is not None and limit > 0:
             return items[-limit:]
         return items
 
-    def get_messages(self, include_system: bool = False, extra_context: Optional[str] = None) -> List[Dict[str, str]]:
+    def get_messages(self, include_system: bool = True, extra_context: Optional[str] = None) -> List[ContextMessage]:
         with self._lock:
-            msgs = [{"role": m["role"], "content": str(m["content"])} for m in self.history]
+            msgs = list(self.history)
         if include_system:
-            return [{"role": "system", "content": self.get_system_prompt(extra_context=extra_context)}] + msgs
+            sys_msg = ContextMessage(role="system", content=self.get_system_prompt(extra_context=extra_context))
+            return [sys_msg] + msgs
         return msgs
 
-    def get_context(self) -> List[Dict[str, str]]:
+    def get_context(self) -> List[ContextMessage]:
         return self.get_messages(include_system=True)
 
     def build_messages(
@@ -105,5 +138,6 @@ class ContextManager:
         self.clear()
 
 
-# Module-level singleton export
+# Module-level singleton exports
 context_manager = ContextManager()
+context_mgr = context_manager

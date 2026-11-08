@@ -1,5 +1,1175 @@
 [
   {
+    "id": "sum_1793647598",
+    "meeting_id": "mtg_1793647598",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-03T00:56:38.975113",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793646961",
+    "meeting_id": "mtg_1793646961",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-03T00:46:01.589802",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793645760",
+    "meeting_id": "mtg_1793645760",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-03T00:26:00.136744",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793561141",
+    "meeting_id": "mtg_1793561141",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:55:41.481888",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793561000",
+    "meeting_id": "mtg_1793561000",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:53:20.272119",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793560688",
+    "meeting_id": "mtg_1793560688",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:48:08.512990",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793560623",
+    "meeting_id": "mtg_1793560623",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:47:03.717794",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793560600",
+    "meeting_id": "mtg_1793560600",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:46:40.017262",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793560199",
+    "meeting_id": "mtg_1793560199",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:39:59.940464",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793559771",
+    "meeting_id": "mtg_1793559771",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:32:51.224624",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793559655",
+    "meeting_id": "mtg_1793559655",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:30:55.643502",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793558904",
+    "meeting_id": "mtg_1793558904",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-11-02T00:18:24.976409",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793306555",
+    "meeting_id": "mtg_1793306555",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T02:12:35.755251",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793306114",
+    "meeting_id": "mtg_1793306114",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T02:05:14.325974",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793305876",
+    "meeting_id": "mtg_1793305876",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T02:01:16.989221",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793305687",
+    "meeting_id": "mtg_1793305687",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:58:07.579266",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793305189",
+    "meeting_id": "mtg_1793305189",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:49:49.704363",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793305053",
+    "meeting_id": "mtg_1793305053",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:47:33.269799",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793304704",
+    "meeting_id": "mtg_1793304704",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:41:44.342410",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793304284",
+    "meeting_id": "mtg_1793304284",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:34:44.467779",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793304026",
+    "meeting_id": "mtg_1793304026",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:30:26.869284",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793303865",
+    "meeting_id": "mtg_1793303865",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:27:45.084059",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793302796",
+    "meeting_id": "mtg_1793302796",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:09:56.209044",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793302249",
+    "meeting_id": "mtg_1793302249",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-30T01:00:49.051659",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297858",
+    "meeting_id": "mtg_1793297858",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:47:38.833216",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297791",
+    "meeting_id": "mtg_1793297791",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:46:31.623501",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297776",
+    "meeting_id": "mtg_1793297776",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:46:16.442666",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297531",
+    "meeting_id": "mtg_1793297531",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:42:11.670908",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297456",
+    "meeting_id": "mtg_1793297456",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:40:56.541503",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297435",
+    "meeting_id": "mtg_1793297435",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:40:35.335402",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297338",
+    "meeting_id": "mtg_1793297338",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:38:58.445267",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297250",
+    "meeting_id": "mtg_1793297250",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:37:30.745776",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297209",
+    "meeting_id": "mtg_1793297209",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:36:49.422695",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297191",
+    "meeting_id": "mtg_1793297191",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:36:31.704804",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297130",
+    "meeting_id": "mtg_1793297130",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:35:30.015507",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297116",
+    "meeting_id": "mtg_1793297116",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:35:16.301611",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297083",
+    "meeting_id": "mtg_1793297083",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:34:43.676309",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793297054",
+    "meeting_id": "mtg_1793297054",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:34:14.377320",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793296873",
+    "meeting_id": "mtg_1793296873",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:31:13.542230",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793296846",
+    "meeting_id": "mtg_1793296846",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:30:46.374426",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793296810",
+    "meeting_id": "mtg_1793296810",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:30:10.927126",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793296796",
+    "meeting_id": "mtg_1793296796",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:29:56.472357",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793296782",
+    "meeting_id": "mtg_1793296782",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:29:42.663833",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793296746",
+    "meeting_id": "mtg_1793296746",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:29:06.255928",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
+    "id": "sum_1793295728",
+    "meeting_id": "mtg_1793295728",
+    "title": "Quarterly Roadmap Review",
+    "url": null,
+    "ended_at": "2026-10-29T23:12:08.512619",
+    "captions_count": 3,
+    "summary": "Executive Summary: Roadmaps reviewed. Bob owns release pipeline.",
+    "transcript": [
+      {
+        "text": "Alice: Welcome everyone to the quarterly roadmap review.",
+        "timestamp": "14:00:10",
+        "platform": "teams"
+      },
+      {
+        "text": "Bob: We need to finalize the API vault before Friday.",
+        "timestamp": "14:02:40",
+        "platform": "teams"
+      },
+      {
+        "text": "Alice: Agreed. Bob will own the release pipeline.",
+        "timestamp": "14:05:00",
+        "platform": "teams"
+      }
+    ]
+  },
+  {
     "id": "sum-1792658724",
     "title": "Quarterly Roadmap Review",
     "date": "2026-10-22 14:15",

@@ -83,8 +83,16 @@
     "answer": "A rather vague inquiry, sir. Could you please provide more context or clarify what you would like me to explain? I'm at your service, ready to shed light on any topic you'd like to discuss.",
     "timestamp": 1784392885.1958168
   },
+  "what is the speed of light": {
+    "answer": "Sir, light travels at approximately 300,000 kilometers per second.",
+    "timestamp": 1793646954.9280972
+  },
+  "what is your name": {
+    "answer": "Good day, sir. I am JARVIS, Joint Automated System for Residential and Virtual Interaction Systems, at your service.",
+    "timestamp": 1793769653.618558
+  },
   "who was albert einstein": {
-    "answer": "Albert Einstein was a theoretical physicist whose work on the theory of relativity fundamentally changed our understanding of space, time, and gravity. By the way, sir, his equation E=mc\u00b2 is arguably the most famous formula in history, though I suspect you already knew that.",
-    "timestamp": 1791797713.5041611
+    "answer": "Sir, Albert Einstein was a renowned German-born theoretical physicist who revolutionized our understanding of space and time with his groundbreaking work on the theory of relativity. His famous equation E=mc\u00b2 has become an iconic representation of his genius, sir.",
+    "timestamp": 1794132848.7430754
   }
 }

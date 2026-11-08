@@ -8,6 +8,7 @@ from .gemini_adapter import GeminiAdapter
 from .groq_adapter import GroqAdapter
 from .anthropic_adapter import AnthropicAdapter
 from .openai_compat import OpenAICompatAdapter, fetch_models
+from .local_gguf_adapter import LocalGGUFAdapter
 
 __all__ = [
     "BaseLLMAdapter",
@@ -17,5 +18,6 @@ __all__ = [
     "GroqAdapter",
     "AnthropicAdapter",
     "OpenAICompatAdapter",
+    "LocalGGUFAdapter",
     "fetch_models",
 ]

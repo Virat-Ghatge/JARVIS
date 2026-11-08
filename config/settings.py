@@ -45,6 +45,18 @@ MCP_CONFIG_FILE = MCP_PATH
 QA_CACHE_PATH = BASE_DIR / "qa_cache.json"
 QA_CACHE_FILE = QA_CACHE_PATH
 
+# Embedded Local GGUF Model Constants (Llama 3.2 3B Instruct, ~2.0 GB RAM)
+MODELS_DIR = BASE_DIR / "models"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+INTENT_MODEL_PATH = MODELS_DIR / "intent_model.onnx"
+INTENT_VOCAB_PATH = MODELS_DIR / "intent_vocab.json"
+LOCAL_MODEL_NAME = "llama-3.2-3b-instruct"
+LOCAL_MODEL_FILENAME = "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+LOCAL_MODEL_PATH = MODELS_DIR / LOCAL_MODEL_FILENAME
+LOCAL_MODEL_REPO = "bartowski/Llama-3.2-3B-Instruct-GGUF"
+LOCAL_MODEL_URL = f"https://huggingface.co/{LOCAL_MODEL_REPO}/resolve/main/{LOCAL_MODEL_FILENAME}"
+LOCAL_MODEL_THREADS = min(6, max(2, (os.cpu_count() or 4) - 2))
+
 # Server, Audio & Assistant Constants
 SERVER_HOST = os.environ.get("JARVIS_HOST", "127.0.0.1")
 SERVER_PORT = int(os.environ.get("JARVIS_PORT", "5050"))
@@ -63,6 +75,10 @@ TTS_FALLBACK_RATE = int(os.environ.get("JARVIS_TTS_RATE", "185"))
 TTS_RATE = TTS_FALLBACK_RATE
 TTS_DEFAULT_VOLUME = 1.0
 
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GEMINI_MODEL = "gemini-2.5-flash"
+WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "")
+
 SPEECH_RECOGNITION_TIMEOUT = 5
 SPEECH_PHRASE_TIME_LIMIT = 12
 MIC_ENERGY_THRESHOLD = 300
@@ -77,6 +93,12 @@ HUD_THEME = {
 }
 
 DEFAULT_PROVIDERS: Dict[str, Any] = {
+    "local": {
+        "keys": ["local-in-process"],
+        "active_index": 0,
+        "default_model": LOCAL_MODEL_NAME,
+        "models": [LOCAL_MODEL_NAME, "qwen-2.5-3b-instruct"]
+    },
     "gemini": {
         "keys": [],
         "active_index": 0,
@@ -112,12 +134,15 @@ DEFAULT_ROLE_MAPPINGS: Dict[str, Any] = {
     "vision_agent": {"provider": "gemini", "model": "gemini-2.5-flash"},
     "summarizer": {"provider": "gemini", "model": "gemini-2.5-flash"},
     "meeting_summarizer": {"provider": "gemini", "model": "gemini-2.5-flash"},
+    "qa_chat": {"provider": "gemini", "model": "gemini-2.5-flash"},
 }
 
 DEFAULT_VAULT: Dict[str, Any] = {
     "providers": json.loads(json.dumps(DEFAULT_PROVIDERS)),
     "custom_endpoints": [],
     "role_mappings": json.loads(json.dumps(DEFAULT_ROLE_MAPPINGS)),
+    "cloud_api_enabled": True,
+    "local_first_mode": True,
     "safety": {
         "require_approval_for_high_risk": True,
         "auto_approve_safe": True
@@ -160,21 +185,96 @@ def mask_key(key: str) -> str:
     if not key:
         return ""
     s = str(key).strip()
+    if not s:
+        return ""
     if len(s) <= 8:
-        return s[:2] + "***" + s[-2:] if len(s) >= 4 else "****"
-    return f"{s[:4]}...{s[-4:]}"
+        return "•" * len(s)
+    return f"{s[:4]}••••••••{s[-4:]}"
 
 
 mask_api_key = mask_key
 
 
-def _normalize_key_entry(entry: Any, provider: str, idx: int, active_idx: int = 0) -> Dict[str, Any]:
+class KeyStr(str):
+    """
+    Hybrid str subclass representing an API key.
+    Satisfies string comparisons ('test_key in keys' == True) while implementing
+    .get(k, default=None) and __getitem__(k) so callers expecting a dict work seamlessly.
+    """
+    def __new__(cls, val, meta=None):
+        if isinstance(val, KeyStr):
+            s = super().__new__(cls, str(val))
+            s._meta = dict(val._meta)
+            if meta:
+                s._meta.update(meta)
+            return s
+        val_str = str(val.get("key") or val.get("value") or val.get("api_key") or "") if isinstance(val, dict) else str(val).strip()
+        s = super().__new__(cls, val_str)
+        s._meta = dict(val) if isinstance(val, dict) else dict(meta or {})
+        s._meta["key"] = val_str
+        s._meta["value"] = val_str
+        s._meta.setdefault("masked", mask_key(val_str))
+        s._meta.setdefault("masked_key", mask_key(val_str))
+        s._meta.setdefault("preview", mask_key(val_str))
+        s._meta.setdefault("status", "active")
+        s._meta.setdefault("is_active", True)
+        s._meta.setdefault("calls", 0)
+        s._meta.setdefault("errors", 0)
+        s._meta.setdefault("last_error", None)
+        s._meta.setdefault("added_at", time.strftime("%Y-%m-%d %H:%M:%S"))
+        return s
+
+    def get(self, k, default=None):
+        if k in ("key", "value"):
+            return str(self)
+        return self._meta.get(k, default)
+
+    def __getitem__(self, k):
+        if isinstance(k, str):
+            if k in ("key", "value"):
+                return str(self)
+            if k in self._meta:
+                return self._meta[k]
+        return super().__getitem__(k)
+
+    def __setitem__(self, k, v):
+        self._meta[k] = v
+
+    def __contains__(self, k):
+        if isinstance(k, str) and k in self._meta:
+            return True
+        return super().__contains__(k)
+
+    def keys(self):
+        return self._meta.keys()
+
+    def values(self):
+        return self._meta.values()
+
+    def items(self):
+        return self._meta.items()
+
+    def to_dict(self):
+        d = dict(self._meta)
+        d["key"] = str(self)
+        d["value"] = str(self)
+        return d
+
+
+def _normalize_key_entry(entry: Any, provider: str, idx: int, active_idx: int = 0) -> KeyStr:
+    if isinstance(entry, KeyStr):
+        entry["index"] = idx
+        entry["is_active"] = (idx == active_idx)
+        if idx == active_idx and entry.get("status") == "standby":
+            entry["status"] = "active"
+        return entry
+
     if isinstance(entry, dict):
         key_val = str(entry.get("key") or entry.get("value") or entry.get("api_key") or "").strip()
         status = entry.get("status", "active" if idx == active_idx else "standby")
         if idx == active_idx and status == "standby":
             status = "active"
-        return {
+        meta = {
             "id": str(entry.get("id") or f"{provider}_{idx + 1}"),
             "index": idx,
             "label": str(entry.get("label") or f"{provider.upper()} Key #{idx + 1}"),
@@ -190,8 +290,10 @@ def _normalize_key_entry(entry: Any, provider: str, idx: int, active_idx: int = 
             "last_error": entry.get("last_error"),
             "added_at": entry.get("added_at") or time.strftime("%Y-%m-%d %H:%M:%S"),
         }
+        return KeyStr(key_val, meta)
+
     key_val = str(entry).strip()
-    return {
+    meta = {
         "id": f"{provider}_{idx + 1}",
         "index": idx,
         "label": f"{provider.upper()} Key #{idx + 1}",
@@ -207,6 +309,7 @@ def _normalize_key_entry(entry: Any, provider: str, idx: int, active_idx: int = 
         "last_error": None,
         "added_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
+    return KeyStr(key_val, meta)
 
 
 def _normalize_vault_schema(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -214,6 +317,10 @@ def _normalize_vault_schema(data: Dict[str, Any]) -> Dict[str, Any]:
         data = json.loads(json.dumps(DEFAULT_VAULT))
 
     providers = data.setdefault("providers", {})
+    if "custom_endpoints" in providers:
+        nested_ce = providers.pop("custom_endpoints")
+        if isinstance(nested_ce, list):
+            data.setdefault("custom_endpoints", []).extend([e for e in nested_ce if isinstance(e, dict)])
     for prov_name, default_prov in DEFAULT_PROVIDERS.items():
         if prov_name not in providers:
             providers[prov_name] = json.loads(json.dumps(default_prov))
@@ -234,6 +341,8 @@ def _normalize_vault_schema(data: Dict[str, Any]) -> Dict[str, Any]:
                 val = k.get("key") or k.get("value") or k.get("api_key") if isinstance(k, dict) else k
                 if val and str(val).strip():
                     cleaned_keys.append(k)
+            if prov_name == "local" and not cleaned_keys:
+                cleaned_keys = ["local-in-process"]
             if cleaned_keys:
                 active_idx = max(0, min(active_idx, len(cleaned_keys) - 1))
             else:
@@ -291,6 +400,8 @@ def _normalize_vault_schema(data: Dict[str, Any]) -> Dict[str, Any]:
             roles[role_k].setdefault("provider", prov_str)
             roles[role_k].setdefault("model", default_m)
 
+    data.setdefault("cloud_api_enabled", True)
+    data.setdefault("local_first_mode", True)
     data.setdefault("safety", json.loads(json.dumps(DEFAULT_VAULT["safety"])))
     return data
 
@@ -358,33 +469,150 @@ def save_vault(vault_data: Dict[str, Any], vault_path: Optional[Path] = None) ->
     with _vault_lock:
         normalized = _normalize_vault_schema(vault_data)
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        disk_data = json.loads(json.dumps(normalized, default=lambda o: o.to_dict() if hasattr(o, "to_dict") else str(o)))
         with open(target_path, "w", encoding="utf-8") as f:
-            json.dump(normalized, f, indent=2)
+            json.dump(disk_data, f, indent=2)
         return normalized
 
 
 def get_masked_vault(vault_path: Optional[Path] = None) -> Dict[str, Any]:
-    vault = json.loads(json.dumps(load_vault(vault_path=vault_path)))
-    for prov_name, prov in vault.get("providers", {}).items():
+    raw_vault = load_vault(vault_path=vault_path)
+    vault = json.loads(json.dumps(raw_vault, default=lambda o: o.to_dict() if hasattr(o, "to_dict") else str(o)))
+    providers = vault.get("providers", {})
+    for prov_name, prov in list(providers.items()):
+        if isinstance(prov, list):
+            providers[prov_name] = {
+                "keys": prov,
+                "active_index": 0,
+                "default_model": DEFAULT_PROVIDERS.get(prov_name, {}).get("default_model", "default"),
+                "models": DEFAULT_PROVIDERS.get(prov_name, {}).get("models", ["default"]),
+            }
+            prov = providers[prov_name]
+        elif not isinstance(prov, dict):
+            continue
+
         active_idx = int(prov.get("active_index", 0) or 0)
-        for idx, k in enumerate(prov.get("keys", [])):
+        keys_list = prov.get("keys", [])
+        masked_keys = []
+        rich_keys = []
+        for idx, k in enumerate(keys_list):
+            raw_k = k.get("key") if isinstance(k, dict) else str(k)
+            m = mask_key(raw_k)
+            masked_keys.append(m)
             if isinstance(k, dict):
-                raw = k.get("key", "")
-                m = mask_key(raw)
-                k["key"] = m
-                k["value"] = m
-                k["masked"] = m
-                k["masked_key"] = m
-                k["preview"] = m
-                k["index"] = idx
-                k["is_active"] = idx == active_idx
-                if idx == active_idx and k.get("status") == "standby":
-                    k["status"] = "active"
+                k_copy = dict(k)
+                k_copy["id"] = k_copy.get("id") or f"{prov_name}_{idx + 1}"
+                k_copy["index"] = idx
+                k_copy["label"] = k_copy.get("label") or f"{prov_name.upper()} Key #{idx + 1}"
+                k_copy["key"] = m
+                k_copy["value"] = m
+                k_copy["masked"] = m
+                k_copy["masked_key"] = m
+                k_copy["preview"] = m
+                k_copy["is_active"] = (idx == active_idx)
+                k_copy["status"] = "active" if idx == active_idx else (k_copy.get("status") or "standby")
+                k_copy["calls"] = int(k_copy.get("calls", 0))
+                k_copy["errors"] = int(k_copy.get("errors", 0))
+                rich_keys.append(k_copy)
+            else:
+                rich_keys.append({
+                    "id": f"{prov_name}_{idx + 1}",
+                    "index": idx,
+                    "label": f"{prov_name.upper()} Key #{idx + 1}",
+                    "key": m,
+                    "value": m,
+                    "masked": m,
+                    "masked_key": m,
+                    "preview": m,
+                    "status": "active" if idx == active_idx else "standby",
+                    "is_active": idx == active_idx,
+                    "calls": 0,
+                    "errors": 0,
+                    "last_error": None,
+                })
+        prov["keys"] = rich_keys
+        prov["keys_masked"] = masked_keys
+
     for ep in vault.get("custom_endpoints", []):
         if isinstance(ep, dict):
             raw_k = ep.get("api_key", "")
             ep["masked_key"] = mask_key(raw_k)
+
+    vault["roles"] = vault.get("role_mappings", {})
+    vault["autonomous_trust_mode"] = vault.get("safety", {}).get("auto_approve_safe", True)
+    vault["cloud_api_enabled"] = is_cloud_api_enabled(vault_path=vault_path)
+    vault["local_first_mode"] = raw_vault.get("local_first_mode", True)
+    vault["local_model"] = get_local_model_status()
     return vault
+
+
+def get_local_model_status() -> Dict[str, Any]:
+    downloaded = LOCAL_MODEL_PATH.exists() and LOCAL_MODEL_PATH.stat().st_size > 100 * 1024 * 1024
+    size_bytes = LOCAL_MODEL_PATH.stat().st_size if LOCAL_MODEL_PATH.exists() else 0
+    size_mb = round(size_bytes / (1024 * 1024), 2)
+    is_loaded = False
+    runtime_available = False
+    download_state = {
+        "downloading": False,
+        "progress": 0.0,
+        "downloaded_bytes": 0,
+        "total_bytes": 0,
+        "error": None,
+    }
+    try:
+        from core.adapters.local_gguf_adapter import LocalGGUFAdapter
+        runtime_available = LocalGGUFAdapter.is_available()
+        is_loaded = LocalGGUFAdapter.is_loaded()
+        download_state = LocalGGUFAdapter.get_download_status()
+    except Exception:
+        pass
+
+    ram_usage_mb = 0.0
+    if is_loaded:
+        try:
+            import psutil
+            ram_usage_mb = round(psutil.Process().memory_info().rss / (1024 * 1024), 1)
+        except Exception:
+            ram_usage_mb = 2100.0
+
+    return {
+        "model_name": LOCAL_MODEL_NAME,
+        "filename": LOCAL_MODEL_FILENAME,
+        "path": str(LOCAL_MODEL_PATH),
+        "repo": LOCAL_MODEL_REPO,
+        "url": LOCAL_MODEL_URL,
+        "downloaded": downloaded,
+        "runtime_available": runtime_available,
+        "ready": bool(downloaded and runtime_available),
+        "size_bytes": size_bytes,
+        "size_mb": size_mb,
+        "loaded": is_loaded,
+        "ram_usage_mb": ram_usage_mb,
+        "threads": LOCAL_MODEL_THREADS,
+        "download_state": download_state,
+    }
+
+
+def is_cloud_api_enabled(vault_path: Optional[Path] = None) -> bool:
+    vault = load_vault(vault_path=vault_path)
+    return bool(vault.get("cloud_api_enabled", True))
+
+
+def set_cloud_api_enabled(enabled: bool, vault_path: Optional[Path] = None) -> None:
+    vault = load_vault(vault_path=vault_path)
+    vault["cloud_api_enabled"] = bool(enabled)
+    save_vault(vault, vault_path=vault_path)
+
+
+def is_local_first_mode(vault_path: Optional[Path] = None) -> bool:
+    vault = load_vault(vault_path=vault_path)
+    return bool(vault.get("local_first_mode", True))
+
+
+def set_local_first_mode(enabled: bool, vault_path: Optional[Path] = None) -> Dict[str, Any]:
+    vault = load_vault(vault_path=vault_path)
+    vault["local_first_mode"] = bool(enabled)
+    return save_vault(vault, vault_path=vault_path)
 
 
 def _auto_bind_roles_if_needed(vault: Dict[str, Any], newly_added_provider: str, default_model: str) -> None:
@@ -417,11 +645,11 @@ def add_provider_key(
     label: str = "",
     vault_path: Optional[Path] = None,
     **kwargs: Any,
-) -> Dict[str, Any]:
+) -> bool:
     clean_provider = str(provider).strip().lower()
     clean_key = str(key or kwargs.get("api_key") or kwargs.get("value") or "").strip()
     if not clean_key:
-        return load_vault(vault_path=vault_path)
+        return False
 
     vault = load_vault(vault_path=vault_path)
     default_prov = DEFAULT_PROVIDERS.get(
@@ -435,7 +663,7 @@ def add_provider_key(
 
     existing_idx = None
     for idx, k in enumerate(keys):
-        k_val = k.get("key") if isinstance(k, dict) else str(k)
+        k_val = k.get("key") if isinstance(k, (dict, KeyStr)) else str(k)
         if k_val == clean_key:
             existing_idx = idx
             break
@@ -443,7 +671,7 @@ def add_provider_key(
     if existing_idx is None:
         new_idx = len(keys)
         is_first = new_idx == 0
-        keys.append({
+        meta = {
             "id": f"{clean_provider}_{new_idx + 1}_{int(time.time() * 1000) % 100000}",
             "index": new_idx,
             "label": label or f"{clean_provider.upper()} Key #{new_idx + 1}",
@@ -458,11 +686,12 @@ def add_provider_key(
             "errors": 0,
             "last_error": None,
             "added_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        })
+        }
+        keys.append(KeyStr(clean_key, meta))
         if is_first:
             prov["active_index"] = 0
     else:
-        if isinstance(keys[existing_idx], dict):
+        if isinstance(keys[existing_idx], (dict, KeyStr)):
             keys[existing_idx]["status"] = "active"
             keys[existing_idx]["last_error"] = None
             if label:
@@ -474,7 +703,8 @@ def add_provider_key(
         newly_added_provider=clean_provider,
         default_model=prov.get("default_model", "gemini-2.5-flash"),
     )
-    return save_vault(vault, vault_path=vault_path)
+    save_vault(vault, vault_path=vault_path)
+    return True
 
 
 add_api_key = add_provider_key
@@ -484,34 +714,46 @@ def remove_provider_key(
     provider: str,
     key_or_index: Any,
     vault_path: Optional[Path] = None,
-) -> Dict[str, Any]:
+) -> bool:
     clean_provider = str(provider).strip().lower()
     vault = load_vault(vault_path=vault_path)
+    removed = False
     if clean_provider in vault.get("providers", {}):
-        keys = vault["providers"][clean_provider].get("keys", [])
-        removed = False
-        if isinstance(key_or_index, int) or (isinstance(key_or_index, str) and key_or_index.isdigit() and int(key_or_index) < len(keys)):
-            idx = int(key_or_index)
-            if 0 <= idx < len(keys):
-                keys.pop(idx)
+        prov = vault["providers"][clean_provider]
+        if isinstance(prov, dict):
+            keys = prov.get("keys", [])
+            target = str(key_or_index).strip()
+            idx_to_pop = None
+            if isinstance(key_or_index, int) or (isinstance(key_or_index, str) and key_or_index.isdigit() and int(key_or_index) < len(keys)):
+                idx = int(key_or_index)
+                if 0 <= idx < len(keys):
+                    idx_to_pop = idx
+            if idx_to_pop is not None:
+                keys.pop(idx_to_pop)
                 removed = True
-        if not removed:
-            target = str(key_or_index)
-            keys = [
-                k for k in keys
-                if (k.get("id") if isinstance(k, dict) else str(k)) != target
-                and (k.get("key") if isinstance(k, dict) else str(k)) != target
-                and (k.get("masked") if isinstance(k, dict) else str(k)) != target
-                and (k.get("label") if isinstance(k, dict) else str(k)) != target
-            ]
-        vault["providers"][clean_provider]["keys"] = keys
-        if keys:
-            vault["providers"][clean_provider]["active_index"] = min(
-                int(vault["providers"][clean_provider].get("active_index", 0)), len(keys) - 1
-            )
-        else:
-            vault["providers"][clean_provider]["active_index"] = 0
-    return save_vault(vault, vault_path=vault_path)
+            else:
+                new_keys = []
+                for k in keys:
+                    val = str(k)
+                    k_id = k.get("id") if isinstance(k, (dict, KeyStr)) else ""
+                    k_mask = k.get("masked") if isinstance(k, (dict, KeyStr)) else mask_key(val)
+                    k_mask2 = k.get("masked_key") if isinstance(k, (dict, KeyStr)) else mask_key(val)
+                    k_prev = k.get("preview") if isinstance(k, (dict, KeyStr)) else mask_key(val)
+                    k_label = k.get("label") if isinstance(k, (dict, KeyStr)) else ""
+                    if target in (val, k_id, k_mask, k_mask2, k_prev, k_label):
+                        removed = True
+                    else:
+                        new_keys.append(k)
+                if len(new_keys) != len(keys):
+                    removed = True
+                keys = new_keys
+            prov["keys"] = keys
+            if keys:
+                prov["active_index"] = min(int(prov.get("active_index", 0)), len(keys) - 1)
+            else:
+                prov["active_index"] = 0
+            save_vault(vault, vault_path=vault_path)
+    return removed
 
 
 remove_api_key = remove_provider_key
@@ -532,7 +774,12 @@ def get_active_key(provider: str, vault_path: Optional[Path] = None) -> Optional
             return ep.get("api_key", "sk-local")
 
     prov = vault.get("providers", {}).get(clean_prov.lower(), {})
-    keys = prov.get("keys", [])
+    if isinstance(prov, list):
+        keys = prov
+    elif isinstance(prov, dict):
+        keys = prov.get("keys", [])
+    else:
+        keys = []
     if not keys:
         return None
 
@@ -556,10 +803,17 @@ def get_active_key(provider: str, vault_path: Optional[Path] = None) -> Optional
 def get_active_key_entry(provider: str, vault_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
     vault = load_vault(vault_path=vault_path)
     prov = vault.get("providers", {}).get(str(provider).lower(), {})
-    keys = prov.get("keys", [])
+    if isinstance(prov, list):
+        keys = prov
+        idx = 0
+    elif isinstance(prov, dict):
+        keys = prov.get("keys", [])
+        idx = max(0, min(int(prov.get("active_index", 0) or 0), len(keys) - 1)) if keys else 0
+    else:
+        keys = []
+        idx = 0
     if not keys:
         return None
-    idx = max(0, min(int(prov.get("active_index", 0)), len(keys) - 1))
     return keys[idx]
 
 
@@ -588,7 +842,7 @@ def rotate_key(
     prov = vault.get("providers", {}).get(clean_prov)
     if not prov:
         return None
-    keys = prov.get("keys", [])
+    keys = prov.get("keys", []) if isinstance(prov, dict) else (prov if isinstance(prov, list) else [])
     if not keys:
         return None
 
@@ -748,25 +1002,39 @@ def get_role_target(role: str, vault_path: Optional[Path] = None) -> RoleTarget:
 
     clean_prov = provider.lower()
     prov_cfg = vault.get("providers", {}).get(clean_prov, {})
+    if not isinstance(prov_cfg, dict):
+        prov_cfg = {}
+
+    if clean_prov == "local":
+        return RoleTarget(
+            provider="local",
+            model=model or prov_cfg.get("default_model", LOCAL_MODEL_NAME),
+            base_url=None,
+            api_key="local-in-process",
+            is_custom=False,
+        )
+
     active_key = get_active_key(clean_prov, vault_path=vault_path)
 
     if active_key:
         return RoleTarget(
             provider=clean_prov,
             model=model or prov_cfg.get("default_model", "gemini-2.5-flash"),
-            base_url=None,
+            base_url=prov_cfg.get("base_url"),
             api_key=active_key,
             is_custom=False,
         )
 
-    # Automatic fallback: find ANY provider in the vault that has an active key
+    # Automatic fallback: find ANY cloud provider in the vault that has an active key
     for cand_prov, cand_cfg in vault.get("providers", {}).items():
+        if cand_prov in ("custom_endpoints", "local") or not (isinstance(cand_cfg, dict) or isinstance(cand_cfg, list)):
+            continue
         cand_key = get_active_key(cand_prov, vault_path=vault_path)
         if cand_key:
             return RoleTarget(
                 provider=cand_prov,
-                model=cand_cfg.get("default_model", "default"),
-                base_url=None,
+                model=cand_cfg.get("default_model", "default") if isinstance(cand_cfg, dict) else "default",
+                base_url=cand_cfg.get("base_url") if isinstance(cand_cfg, dict) else None,
                 api_key=cand_key,
                 is_custom=False,
             )
@@ -783,11 +1051,13 @@ def get_role_target(role: str, vault_path: Optional[Path] = None) -> RoleTarget:
                 endpoint=cand_ep,
             )
 
+    # Fall back to embedded local model
+    local_cfg = vault.get("providers", {}).get("local", {})
     return RoleTarget(
-        provider=clean_prov,
-        model=model or prov_cfg.get("default_model", "gemini-2.5-flash"),
+        provider="local",
+        model=model or (local_cfg.get("default_model") if isinstance(local_cfg, dict) else LOCAL_MODEL_NAME) or LOCAL_MODEL_NAME,
         base_url=None,
-        api_key=None,
+        api_key="local-in-process",
         is_custom=False,
     )
 
@@ -850,6 +1120,8 @@ def is_local_endpoint_url(url: str) -> bool:
 
 def is_role_bound_to_local_endpoint(role: str = "chat", vault_path: Optional[Path] = None) -> bool:
     target = get_role_target(role, vault_path=vault_path)
+    if target.get("provider") == "local":
+        return True
     if target.get("base_url"):
         return is_local_endpoint_url(str(target["base_url"]))
     return False

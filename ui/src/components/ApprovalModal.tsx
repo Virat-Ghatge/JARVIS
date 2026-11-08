@@ -95,14 +95,14 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({ request, apiBase, 
               </h3>
               <div className="flex items-center space-x-2 mt-0.5">
                 <AlertTriangle size={12} className="text-gold-reactor" />
-                <span className="text-[11px] text-gold-reactor font-mono">{request.action_type.toUpperCase()}</span>
+                <span className="text-[11px] text-gold-reactor font-mono">{(request.action_type || 'action').toUpperCase()}</span>
               </div>
             </div>
           </div>
 
           {/* Description */}
           <div className="bg-void/60 border border-cyber rounded p-3">
-            <p className="text-xs text-ice leading-relaxed">{request.description}</p>
+            <p className="text-xs text-ice leading-relaxed">{request.description || 'Action approval requested.'}</p>
           </div>
 
           {/* Code/Command Preview */}

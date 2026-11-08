@@ -80,7 +80,7 @@ class QAHandler:
             print("[QA] Groq SDK not installed — run: pip install groq")
             return None
         if not api_key:
-            print("[QA] GROQ_API_KEY not set in .env — Q&A via Groq disabled")
+            print("[QA] GROQ_API_KEY not set in .env — routing Q&A via local/unified LLM router")
             return None
 
         try:
@@ -133,12 +133,14 @@ class QAHandler:
     def is_question(self, command):
         """Return True if command looks like a factual/conversational question."""
         cmd = command.lower().strip()
+        cmd = re.sub(r'^(?:hey\s+)?jarvis[,:]?\s+', '', cmd)
         return any(cmd.startswith(s) for s in QUESTION_STARTERS)
 
     def extract_query(self, command):
         """Strip filler words and return the core query."""
         query = command.lower().strip().rstrip('?')
-        for filler in ['jarvis ', 'hey jarvis ', 'please ', 'can you ', 'could you ']:
+        query = re.sub(r'^(?:hey\s+)?jarvis[,:]?\s+', '', query)
+        for filler in ['please ', 'can you ', 'could you ']:
             if query.startswith(filler):
                 query = query[len(filler):]
         return query.strip()
@@ -236,11 +238,11 @@ class QAHandler:
             self.jarvis.speak(cached)
             return True
 
-        # 2. Unified LLM Router (qa_chat role via vault config)
+        # 2. Unified LLM Router (qa_chat role via vault config, supports local model & cloud keys)
         try:
             from core.llm_router import router as llm_router
             answer = llm_router.query_text("qa_chat", query, system_prompt=SYSTEM_PROMPT)
-            if answer and answer.strip():
+            if answer and answer.strip() and not answer.startswith("All configured LLM providers failed") and not answer.startswith("No LLM API keys"):
                 answer = re.sub(r'\*+', '', answer)
                 answer = re.sub(r'#+\s*', '', answer)
                 print("[Source] LLM Router (qa_chat)")
@@ -281,6 +283,13 @@ class QAHandler:
         # 5. Both failed — open browser
         print("[QA] LLMs unavailable — falling back to web search")
         self.jarvis.speak("I couldn't find a direct answer, sir. Let me search the web for that.")
-        self.jarvis.web_handler.web_search(f"search {query}")
+        try:
+            from integrations.handlers import web_search as web_search_module
+            for fn_name in ("web_search", "search_web", "handle_search", "handle"):
+                fn = getattr(web_search_module, fn_name, None)
+                if callable(fn):
+                    fn(f"search {query}")
+                    break
+        except Exception as e:
+            print(f"[QA] Web search fallback failed: {e}")
         return True
-

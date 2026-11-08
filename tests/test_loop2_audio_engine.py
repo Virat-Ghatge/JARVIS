@@ -3,6 +3,12 @@
 Test Suite for Loop 2: Audio State Machine, Meeting Interlock & Unified Input Gateway
 """
 
+import sys
+from pathlib import Path
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import unittest
 from unittest.mock import MagicMock, patch
 from audio.tts_engine import TTSEngine
@@ -12,6 +18,10 @@ from core.engine import JARVISEngine
 
 class TestLoop2AudioEngine(unittest.TestCase):
     def setUp(self):
+        self._sr_mic_patch = patch("speech_recognition.Microphone")
+        self._sr_rec_patch = patch("speech_recognition.Recognizer")
+        self._sr_mic_patch.start()
+        self._sr_rec_patch.start()
         # Create isolated instances
         self.tts = TTSEngine(tts_active=True)
         self.listener = VoiceListener()
@@ -22,9 +32,20 @@ class TestLoop2AudioEngine(unittest.TestCase):
         self.engine = JARVISEngine(tts=self.silent_tts, listener=self.listener)
 
     def tearDown(self):
-        self.tts.stop()
-        self.silent_tts.stop()
-        self.listener.stop()
+        if hasattr(self.tts, "shutdown"):
+            self.tts.shutdown()
+        else:
+            self.tts.stop()
+        if hasattr(self.silent_tts, "shutdown"):
+            self.silent_tts.shutdown()
+        else:
+            self.silent_tts.stop()
+        if hasattr(self.listener, "shutdown"):
+            self.listener.shutdown()
+        else:
+            self.listener.stop()
+        self._sr_mic_patch.stop()
+        self._sr_rec_patch.stop()
 
     def test_tts_toggle_independent(self):
         self.assertTrue(self.tts.get_tts_active())

@@ -6,6 +6,7 @@ Includes independent thread-safe tts_active state controls to allow silent GUI o
 """
 
 import asyncio
+import atexit
 import os
 import queue
 import tempfile
@@ -67,10 +68,11 @@ class TTSEngine:
         self._pygame_initialized = False
         if PYGAME_AVAILABLE:
             try:
-                pygame.mixer.init()
+                if not pygame.mixer.get_init():
+                    pygame.mixer.init()
                 self._pygame_initialized = True
             except Exception as e:
-                print(f"[TTS] pygame mixer init warning: {e}")
+                pass
 
         # Start background worker thread
         self._worker_thread = threading.Thread(target=self._speech_worker, daemon=True, name="TTS-Worker")
@@ -123,7 +125,23 @@ class TTSEngine:
         """Stop current speech playback immediately."""
         if PYGAME_AVAILABLE and self._pygame_initialized:
             try:
-                pygame.mixer.music.stop()
+                if pygame.mixer.get_init():
+                    pygame.mixer.music.stop()
+            except Exception:
+                pass
+
+    def shutdown(self) -> None:
+        """Shut down background worker cleanly."""
+        self.stop()
+        with self._lock:
+            self._tts_active = False
+        try:
+            self._speech_queue.put_nowait(None)
+        except Exception:
+            pass
+        if self._worker_thread and self._worker_thread.is_alive():
+            try:
+                self._worker_thread.join(timeout=0.5)
             except Exception:
                 pass
 
@@ -230,6 +248,11 @@ class TTSEngine:
         if not PYTTSX3_AVAILABLE:
             return
         try:
+            try:
+                import pythoncom
+                pythoncom.CoInitialize()
+            except Exception:
+                pass
             engine = pyttsx3.init()
             engine.setProperty("rate", self.rate)
             engine.say(text)
@@ -241,3 +264,13 @@ class TTSEngine:
 
 # Global TTS instance
 tts_engine = TTSEngine()
+
+def _cleanup_pygame():
+    try:
+        if PYGAME_AVAILABLE and pygame.mixer.get_init():
+            pygame.mixer.music.stop()
+            pygame.mixer.quit()
+    except Exception:
+        pass
+
+atexit.register(_cleanup_pygame)

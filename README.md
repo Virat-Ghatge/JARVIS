@@ -1,7 +1,7 @@
 # JARVIS 2.0 — Autonomous OS Agent & Holographic HUD
 
 > **Just A Rather Very Intelligent System**  
-> Autonomous AI Agent with Marvel Arc-Cyan Holographic HUD, FastAPI + WebSocket Engine, Multi-Key Dynamic Vault, 3-Tier OS Actuator, and Playwright Meeting Attendant.
+> Autonomous AI Agent with a blue-and-orange command-center web app, FastAPI + WebSocket Engine, Multi-Key Dynamic Vault, 3-Tier OS Actuator, and Playwright Meeting Attendant.
 
 JARVIS 2.0 is an autonomous desktop OS agent and voice/text companion inspired by Tony Stark's AI assistant from Iron Man. Featuring a React + Vite + Tailwind CSS tactical HUD served inside a native PyWebView desktop container, sub-second local deterministic triage, autonomous 3-tier OS action engine, Model Context Protocol (MCP) tool integration, live meeting captions with AI summaries, and multi-provider LLM failover routing.
 
@@ -37,7 +37,7 @@ JARVIS 2.0 is an autonomous desktop OS agent and voice/text companion inspired b
 
 | Feature | Description |
 |---------|-------------|
-| **Marvel Holographic HUD** | Pure geometric Arc Cyan (`#00E5FF`) and Reactor Gold HUD built with React, Vite, and Tailwind CSS |
+| **JARVIS Command Center** | Responsive blue (`#4DA3FF`) and orange (`#FF8A1F`) web app built with React, Vite, and Tailwind CSS |
 | **Native PyWebView Container** | Frameless, modern native desktop window with browser fallback at `http://127.0.0.1:5050` |
 | **FastAPI + WebSocket Engine** | Real-time bi-directional telemetry and command streaming on port 5050 |
 | **Multi-Key API Vault** | Hot-swappable key rotation across Gemini, Groq, Anthropic, OpenRouter, and Ollama with custom OpenAI endpoints |
@@ -75,6 +75,16 @@ npm install
 npm run build
 cd ..
 ```
+
+The bundled local GGUF engine uses `llama-cpp-python`. The setup utility can verify or install the runtime and benchmark the model:
+
+```bash
+python scripts/setup_local_model.py --test-only
+```
+
+### AI connection routing
+
+JARVIS sends conversational chat and Q&A through a single router. Local GGUF inference is first when **Local-first** is enabled, followed by the configured role provider, other configured providers, and enabled OpenAI-compatible endpoints. If the selected provider is unavailable or rate-limited, the router fails over without exposing API keys to the web app. The **Connections** tab shows local runtime readiness, route mode, provider pools, and connection test results.
 
 ### 3. Launch Modes
 

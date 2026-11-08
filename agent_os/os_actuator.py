@@ -19,6 +19,21 @@ except Exception:
     PYNPUT_AVAILABLE = False
 
 
+class _CallableBool(int):
+    def __call__(self) -> bool:
+        return bool(self)
+    def __repr__(self) -> str:
+        return "True" if self else "False"
+
+
+class ActionResult(dict):
+    """
+    Dict subclass for actuator actions that evaluates to True if success is True, False otherwise.
+    """
+    def __bool__(self) -> bool:
+        return bool(self.get("success", False))
+
+
 class OSActuator:
     """
     Tier 3 OS GUI Actuator with strictly task-scoped [ESC] emergency kill-switch.
@@ -32,16 +47,16 @@ class OSActuator:
         self._on_abort_callback = on_abort_callback
 
     @property
-    def is_aborted(self) -> bool:
-        return self._abort_event.is_set()
+    def is_aborted(self) -> _CallableBool:
+        return _CallableBool(1 if self._abort_event.is_set() else 0)
 
     @property
-    def aborted(self) -> bool:
-        return self._abort_event.is_set()
+    def aborted(self) -> _CallableBool:
+        return _CallableBool(1 if self._abort_event.is_set() else 0)
 
     @property
-    def kill_switch_triggered(self) -> bool:
-        return self._abort_event.is_set()
+    def kill_switch_triggered(self) -> _CallableBool:
+        return _CallableBool(1 if self._abort_event.is_set() else 0)
 
     def reset_abort(self) -> None:
         self._abort_event.clear()
@@ -112,21 +127,24 @@ class OSActuator:
     def hotkey(self, *keys: str) -> Dict[str, Any]:
         return self.execute_action({"action": "hotkey", "keys": list(keys)})
 
+    def press_hotkey(self, *keys: str) -> Dict[str, Any]:
+        return self.hotkey(*keys)
+
     def execute_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
         if self.is_aborted:
-            return {"status": "aborted", "success": False, "detail": "Emergency [ESC] kill-switch triggered."}
+            return ActionResult(status="aborted", success=False, detail="Emergency [ESC] kill-switch triggered.")
 
         act_type = str(action.get("action", action.get("type", ""))).lower().strip()
         if act_type in ("done", "complete", "finish"):
-            return {"status": "done", "success": True, "detail": action.get("reason", "Goal achieved.")}
+            return ActionResult(status="done", success=True, detail=action.get("reason", "Goal achieved."))
 
         if act_type == "wait":
             seconds = float(action.get("seconds", 1.0))
             time.sleep(min(seconds, 10.0))
-            return {"status": "ok", "success": True, "detail": f"Waited {seconds}s"}
+            return ActionResult(status="ok", success=True, detail=f"Waited {seconds}s")
 
         if pyautogui is None:
-            return {"status": "simulated", "success": True, "detail": f"Simulated {act_type} (PyAutoGUI unavailable)"}
+            return ActionResult(status="simulated", success=True, detail=f"Simulated {act_type} (PyAutoGUI unavailable)")
 
         try:
             if act_type == "click":
@@ -135,13 +153,13 @@ class OSActuator:
                 button = str(action.get("button", "left"))
                 clicks = int(action.get("clicks", 1))
                 pyautogui.click(x=x, y=y, clicks=clicks, button=button)
-                return {"status": "ok", "success": True, "detail": f"Clicked ({x}, {y}) [{button} x{clicks}]"}
+                return ActionResult(status="ok", success=True, detail=f"Clicked ({x}, {y}) [{button} x{clicks}]")
 
             elif act_type == "double_click":
                 x = int(action.get("x", 0))
                 y = int(action.get("y", 0))
                 pyautogui.doubleClick(x=x, y=y)
-                return {"status": "ok", "success": True, "detail": f"Double-clicked ({x}, {y})"}
+                return ActionResult(status="ok", success=True, detail=f"Double-clicked ({x}, {y})")
 
             elif act_type in ("type", "type_text"):
                 text = str(action.get("text", ""))
@@ -152,19 +170,19 @@ class OSActuator:
                 pyautogui.write(text, interval=0.02)
                 if press_enter:
                     pyautogui.press("enter")
-                return {"status": "ok", "success": True, "detail": f"Typed {len(text)} chars"}
+                return ActionResult(status="ok", success=True, detail=f"Typed {len(text)} chars")
 
             elif act_type == "hotkey":
                 keys = action.get("keys", [])
                 if isinstance(keys, str):
                     keys = [k.strip() for k in keys.split("+") if k.strip()]
                 pyautogui.hotkey(*keys)
-                return {"status": "ok", "success": True, "detail": f"Hotkey {'+'.join(keys)}"}
+                return ActionResult(status="ok", success=True, detail=f"Hotkey {'+'.join(keys)}")
 
             elif act_type == "scroll":
                 amount = int(action.get("amount", -300))
                 pyautogui.scroll(amount)
-                return {"status": "ok", "success": True, "detail": f"Scrolled {amount}"}
+                return ActionResult(status="ok", success=True, detail=f"Scrolled {amount}")
 
             return {"status": "error", "success": False, "detail": f"Unknown OS action type: {act_type}"}
         except Exception as exc:

@@ -7,19 +7,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        void: '#060A12',
-        tactical: 'rgba(13, 22, 38, 0.82)',
+        void: '#07111F',
+        tactical: 'rgba(11, 24, 43, 0.86)',
         cyan: {
-          arc: '#00E5FF',
-          glow: 'rgba(0, 229, 255, 0.25)',
+          arc: '#4DA3FF',
+          glow: 'rgba(77, 163, 255, 0.25)',
         },
         gold: {
-          reactor: '#FFB300',
-          glow: 'rgba(255, 179, 0, 0.25)',
+          reactor: '#FF8A1F',
+          glow: 'rgba(255, 138, 31, 0.25)',
         },
-        cyber: '#16324A',
-        ice: '#E6F7FF',
-        steel: '#6488A4',
+        cyber: '#1C3B62',
+        ice: '#F1F7FF',
+        steel: '#7D9AB8',
         crimson: '#FF3B5C',
       },
       fontFamily: {
@@ -27,9 +27,9 @@ export default {
         hud: ['Orbitron', 'Rajdhani', 'Inter', 'sans-serif'],
       },
       boxShadow: {
-        'arc-glow': '0 0 15px rgba(0, 229, 255, 0.25)',
-        'arc-glow-lg': '0 0 25px rgba(0, 229, 255, 0.4)',
-        'reactor-glow': '0 0 15px rgba(255, 179, 0, 0.25)',
+        'arc-glow': '0 0 15px rgba(77, 163, 255, 0.25)',
+        'arc-glow-lg': '0 0 25px rgba(77, 163, 255, 0.4)',
+        'reactor-glow': '0 0 15px rgba(255, 138, 31, 0.25)',
         'crimson-glow': '0 0 15px rgba(255, 59, 92, 0.3)',
       },
       animation: {
@@ -44,8 +44,8 @@ export default {
           '100%': { transform: 'rotate(0deg)' },
         },
         'pulse-glow': {
-          '0%, 100%': { opacity: 0.9, filter: 'drop-shadow(0 0 8px rgba(0,229,255,0.4))' },
-          '50%': { opacity: 0.5, filter: 'drop-shadow(0 0 2px rgba(0,229,255,0.1))' },
+          '0%, 100%': { opacity: 0.9, filter: 'drop-shadow(0 0 8px rgba(77,163,255,0.4))' },
+          '50%': { opacity: 0.5, filter: 'drop-shadow(0 0 2px rgba(77,163,255,0.1))' },
         },
         'scanline': {
           '0%': { transform: 'translateY(-100%)' },

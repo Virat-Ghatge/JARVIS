@@ -30,24 +30,7 @@
       "default_model": "gemini-2.5-flash"
     },
     "groq": {
-      "keys": [
-        {
-          "id": "groq_1_73558",
-          "index": 0,
-          "label": "GROQ Key #1",
-          "key": "sk_live_integration_test_secret_9999",
-          "value": "sk_live_integration_test_secret_9999",
-          "masked": "sk_l...9999",
-          "masked_key": "sk_l...9999",
-          "preview": "sk_l...9999",
-          "status": "active",
-          "is_active": true,
-          "calls": 0,
-          "errors": 0,
-          "last_error": null,
-          "added_at": "2026-10-25 06:38:56"
-        }
-      ],
+      "keys": [],
       "active_index": 0,
       "models": [
         "llama-3.3-70b-versatile",
@@ -81,22 +64,6 @@
         "llama3.2:latest"
       ]
     },
-    "custom_endpoints": [
-      {
-        "id": "custom-1792682413669",
-        "name": "free jarvis",
-        "base_url": "http://127.0.0.1:31415/v1",
-        "api_key": "freellmapi-dc45c78fe6033a2efb4e3ae1cb7ecbadf4eb082297adaf79",
-        "model": "auto:jarvis"
-      },
-      {
-        "id": "custom-1792888783162",
-        "name": "free llms",
-        "base_url": "http://127.0.0.1:31415/v1",
-        "api_key": "freellmapi-dc45c78fe6033a2efb4e3ae1cb7ecbadf4eb082297adaf79",
-        "model": "auto"
-      }
-    ],
     "openweathermap": {
       "keys": [],
       "keys_masked": []
@@ -108,6 +75,17 @@
       "models": [
         "gpt-4o-mini",
         "gpt-4o"
+      ]
+    },
+    "local": {
+      "keys": [
+        "local-in-process"
+      ],
+      "active_index": 0,
+      "default_model": "llama-3.2-3b-instruct",
+      "models": [
+        "llama-3.2-3b-instruct",
+        "qwen-2.5-3b-instruct"
       ]
     }
   },
@@ -125,45 +103,75 @@
       "enabled": true,
       "min_request_interval_ms": 65,
       "url": "http://127.0.0.1:8000/v1",
-      "masked_key": "sk-l...free"
+      "masked_key": "sk-l\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022free"
+    },
+    {
+      "id": "custom-1792682413669",
+      "name": "free jarvis",
+      "base_url": "http://127.0.0.1:31415/v1",
+      "api_key": "sk-local",
+      "model": "auto:jarvis",
+      "url": "http://127.0.0.1:31415/v1",
+      "masked_key": "free\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022af79",
+      "default_model": "auto:jarvis",
+      "enabled": true,
+      "min_request_interval_ms": 65
+    },
+    {
+      "id": "custom-1792888783162",
+      "name": "free llms",
+      "base_url": "http://127.0.0.1:31415/v1",
+      "api_key": "sk-local",
+      "model": "auto",
+      "url": "http://127.0.0.1:31415/v1",
+      "masked_key": "free\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022af79",
+      "default_model": "auto",
+      "enabled": true,
+      "min_request_interval_ms": 65
     }
   ],
   "role_mappings": {
     "chat": {
-      "provider": "gemini",
-      "model": "gemini-2.5-flash"
+      "provider": "custom:custom-1792888783162",
+      "model": "auto"
     },
     "router": {
-      "provider": "gemini",
-      "model": "gemini-2.5-flash"
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
     },
     "coding": {
-      "provider": "gemini",
-      "model": "gemini-2.5-flash"
+      "provider": "custom:custom-1792888783162",
+      "model": "auto"
     },
     "code_synth": {
-      "provider": "gemini",
-      "model": "gemini-2.5-flash"
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
     },
     "vision": {
-      "provider": "gemini",
-      "model": "gemini-2.5-flash"
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
     },
     "vision_agent": {
-      "provider": "gemini",
-      "model": "gemini-2.5-flash"
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
     },
     "summarizer": {
-      "provider": "gemini",
-      "model": "gemini-2.5-flash"
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
     },
     "meeting_summarizer": {
-      "provider": "gemini",
-      "model": "gemini-2.5-flash"
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
+    },
+    "qa_chat": {
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
     }
   },
   "safety": {
     "require_approval_for_high_risk": true,
     "auto_approve_safe": true
-  }
+  },
+  "local_first_mode": true,
+  "cloud_api_enabled": true
 }

@@ -20,6 +20,15 @@ BASE_DIR = Path(__file__).resolve().parent
 UI_DIST_INDEX = BASE_DIR / "ui" / "dist" / "index.html"
 
 
+def is_server_ready(host: str, port: int, timeout: float = 0.5) -> bool:
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"http://{host}:{port}/", timeout=timeout) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
 def is_port_listening(host: str, port: int, timeout: float = 0.5) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
@@ -28,13 +37,20 @@ def is_port_listening(host: str, port: int, timeout: float = 0.5) -> bool:
         return False
 
 
-def wait_for_server_ready(host: str, port: int, max_wait_sec: float = 15.0) -> bool:
+def wait_for_server_ready(
+    host: str,
+    port: int,
+    max_wait_sec: float = 15.0,
+    proc: Optional[subprocess.Popen] = None,
+) -> bool:
     deadline = time.time() + max_wait_sec
     while time.time() < deadline:
-        if is_port_listening(host, port):
+        if proc is not None and proc.poll() is not None:
+            return False
+        if is_server_ready(host, port):
             return True
         time.sleep(0.15)
-    return False
+    return is_server_ready(host, port)
 
 
 def find_chromium_binary() -> Optional[str]:
@@ -57,8 +73,18 @@ def find_chromium_binary() -> Optional[str]:
                 full = os.path.join(root, rel)
                 if os.path.isfile(full):
                     candidates.append(full)
+    elif sys.platform == "darwin":
+        mac_paths = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+            os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+        ]
+        for p in mac_paths:
+            if os.path.isfile(p):
+                candidates.append(p)
 
-    for binary_name in ("chrome", "google-chrome", "msedge", "chromium", "chromium-browser"):
+    for binary_name in ("chrome", "google-chrome", "msedge", "chromium", "chromium-browser", "brave"):
         resolved = shutil.which(binary_name)
         if resolved:
             candidates.append(resolved)
@@ -68,7 +94,7 @@ def find_chromium_binary() -> Optional[str]:
 
 def launch_hud_app_window(url: str) -> Optional[subprocess.Popen]:
     browser_bin = find_chromium_binary()
-    hud_profile_dir = BASE_DIR / ".hud_app_profile"
+    hud_profile_dir = Path(os.environ.get("LOCALAPPDATA", str(BASE_DIR))) / "JARVIS_HUD_Profile"
     hud_profile_dir.mkdir(parents=True, exist_ok=True)
 
     if browser_bin:
@@ -80,6 +106,8 @@ def launch_hud_app_window(url: str) -> Optional[subprocess.Popen]:
             "--disable-features=Translate",
             "--no-first-run",
             "--no-default-browser-check",
+            "--disable-session-crashed-bubble",
+            "--disable-infobars",
             "--disk-cache-size=1",
         ]
         try:
@@ -98,7 +126,13 @@ def launch_hud_app_window(url: str) -> Optional[subprocess.Popen]:
 def _is_ui_build_stale() -> bool:
     if not UI_DIST_INDEX.exists():
         return True
+    dist_assets = BASE_DIR / "ui" / "dist" / "assets"
+    if not dist_assets.exists() or not list(dist_assets.glob("*.js")):
+        return True
     dist_mtime = UI_DIST_INDEX.stat().st_mtime
+    ui_index = BASE_DIR / "ui" / "index.html"
+    if ui_index.exists() and ui_index.stat().st_mtime > dist_mtime:
+        return True
     src_dir = BASE_DIR / "ui" / "src"
     if not src_dir.exists():
         return False
@@ -116,7 +150,9 @@ def ensure_frontend_built(force: bool = False) -> None:
         npm_cmd = "npm.cmd" if sys.platform.startswith("win") else "npm"
         if shutil.which(npm_cmd):
             print("[JARVIS Supervisor] Building React HUD (npm run build)...")
-            subprocess.run([npm_cmd, "run", "build"], cwd=str(ui_dir), check=False)
+            res = subprocess.run([npm_cmd, "run", "build"], cwd=str(ui_dir), check=False)
+            if res.returncode != 0:
+                print(f"[JARVIS Supervisor] WARNING: Frontend build exited with code {res.returncode}.")
 
 
 def run_backend_server() -> subprocess.Popen:
@@ -133,6 +169,9 @@ def run_backend_server() -> subprocess.Popen:
         "info",
     ]
     return subprocess.Popen(cmd, cwd=str(BASE_DIR))
+
+
+start_backend = run_backend_server
 
 
 def main() -> None:
@@ -168,8 +207,8 @@ def main() -> None:
     signal.signal(signal.SIGINT, _graceful_shutdown)
     signal.signal(signal.SIGTERM, _graceful_shutdown)
 
-    if not wait_for_server_ready(HOST, PORT, max_wait_sec=20.0):
-        print("[JARVIS 2.0 Supervisor] ERROR: Backend failed to bind to 127.0.0.1:5050.")
+    if not wait_for_server_ready(HOST, PORT, max_wait_sec=20.0, proc=backend_proc):
+        print("[JARVIS 2.0 Supervisor] ERROR: Backend failed to start or bind to 127.0.0.1:5050.")
         _graceful_shutdown()
 
     print("[JARVIS 2.0 Supervisor] Backend online. Launching Chromium --app Holographic HUD...")

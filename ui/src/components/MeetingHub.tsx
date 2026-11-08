@@ -55,9 +55,9 @@ interface MeetingHubProps {
 }
 
 export const MeetingHub: React.FC<MeetingHubProps> = ({
-  meetings,
-  summaries,
-  liveCaptions,
+  meetings = [],
+  summaries = [],
+  liveCaptions = [],
   currentMeeting,
   onAddMeeting,
   onDeleteMeeting,
@@ -267,7 +267,10 @@ export const MeetingHub: React.FC<MeetingHubProps> = ({
             <span className="font-bold text-[11px] text-ice">INSTANT CALL:</span>
           </div>
           <input
+            id="instant-url-input"
+            name="instantUrlInput"
             type="text"
+            autoComplete="off"
             placeholder="Paste Google Meet or Teams link for immediate direct join..."
             value={instantUrl}
             onChange={(e) => setInstantUrl(e.target.value)}
@@ -294,14 +297,20 @@ export const MeetingHub: React.FC<MeetingHubProps> = ({
             </div>
             <form onSubmit={handleCreate} className="space-y-2">
               <input
+                id="new-meeting-title"
+                name="newMeetingTitle"
                 type="text"
+                autoComplete="off"
                 placeholder="Meeting Title (e.g. Sprint Planning)"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 className="w-full bg-void/80 border border-cyber focus:border-cyan-arc text-ice p-2 rounded focus:outline-none"
               />
               <input
+                id="new-meeting-url"
+                name="newMeetingUrl"
                 type="text"
+                autoComplete="off"
                 placeholder="Meeting URL (Google Meet or Teams link)"
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
@@ -309,6 +318,8 @@ export const MeetingHub: React.FC<MeetingHubProps> = ({
               />
               <div className="flex flex-wrap sm:flex-nowrap gap-2">
                 <input
+                  id="new-meeting-time"
+                  name="newMeetingTime"
                   type="datetime-local"
                   value={newTime}
                   onChange={(e) => setNewTime(e.target.value)}
@@ -317,6 +328,8 @@ export const MeetingHub: React.FC<MeetingHubProps> = ({
                 <div className="flex items-center space-x-1.5 bg-void/80 border border-cyber px-2.5 py-1.5 rounded flex-shrink-0">
                   <Clock size={12} className="text-steel" />
                   <input
+                    id="new-meeting-duration"
+                    name="newMeetingDuration"
                     type="number"
                     min={5}
                     max={480}
@@ -364,7 +377,7 @@ export const MeetingHub: React.FC<MeetingHubProps> = ({
                       </div>
                       <div className="text-[10px] text-steel flex items-center space-x-2">
                         <Clock size={10} />
-                        <span>{new Date(m.start_time).toLocaleString()}</span>
+                        <span>{m.start_time ? new Date(m.start_time).toLocaleString() : 'TBD'}</span>
                         <span>•</span>
                         <span className="uppercase text-cyan-arc">{m.platform || 'MEETING'}</span>
                       </div>
@@ -484,6 +497,9 @@ export const MeetingHub: React.FC<MeetingHubProps> = ({
               Paste a JSON array of meetings to bulk-schedule, or export your current schedule JSON:
             </div>
             <textarea
+              id="bulk-meetings-json"
+              name="bulkMeetingsJson"
+              autoComplete="off"
               value={bulkJson}
               onChange={(e) => setBulkJson(e.target.value)}
               placeholder={`[\n  {\n    "title": "Team Standup",\n    "meeting_url": "https://meet.google.com/abc-defg-hij",\n    "start_time": "2026-10-22T14:00:00",\n    "end_time": "2026-10-22T15:00:00"\n  }\n]`}

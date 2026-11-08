@@ -16,8 +16,9 @@ interface TaskInspectorProps {
   onAbortAgent: () => void;
 }
 
-export const TaskInspector: React.FC<TaskInspectorProps> = ({ steps, onAbortAgent }) => {
-  const currentStep = steps.length > 0 ? steps[steps.length - 1] : null;
+export const TaskInspector: React.FC<TaskInspectorProps> = ({ steps = [], onAbortAgent }) => {
+  const safeSteps = Array.isArray(steps) ? steps : [];
+  const currentStep = safeSteps.length > 0 ? safeSteps[safeSteps.length - 1] : null;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-void/30 p-4 space-y-4 overflow-hidden">
@@ -53,18 +54,18 @@ export const TaskInspector: React.FC<TaskInspectorProps> = ({ steps, onAbortAgen
         <div className="flex flex-col bg-tactical border border-cyber rounded p-3 overflow-hidden hud-panel">
           <div className="flex items-center justify-between pb-2 border-b border-cyber/50 text-xs font-mono text-steel">
             <span>EXECUTION PIPELINE</span>
-            <span>{steps.length} EVENTS RECORDED</span>
+            <span>{safeSteps.length} EVENTS RECORDED</span>
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-3 mt-3 pr-1 font-mono text-xs">
-            {steps.length === 0 ? (
+            {safeSteps.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-steel/50 select-none">
                 <Terminal size={32} className="mb-2 opacity-50" />
                 <span>No active autonomous OS tasks.</span>
                 <span className="text-[10px] mt-1 text-steel/40">Tier 1-3 tasks will stream steps live here.</span>
               </div>
             ) : (
-              steps.map((s, idx) => (
+              safeSteps.map((s, idx) => (
                 <div
                   key={idx}
                   className={`p-2.5 rounded border text-xs space-y-1.5 ${
@@ -78,7 +79,7 @@ export const TaskInspector: React.FC<TaskInspectorProps> = ({ steps, onAbortAgen
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-ice flex items-center space-x-1.5">
                       <span className="text-gold-reactor">STEP {s.step}</span>
-                      <span className="text-steel">[{s.tier.toUpperCase()}]</span>
+                      <span className="text-steel">[{(s.tier || 'agent').toUpperCase()}]</span>
                     </span>
                     <span
                       className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-bold ${

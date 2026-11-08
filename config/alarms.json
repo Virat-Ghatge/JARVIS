@@ -1,4 +1,17 @@
 {
-  "alarms": [],
+  "alarms": [
+    {
+      "id": "alr-1794136523767",
+      "label": "Alarm for 9:15 AM",
+      "time": "09:15",
+      "type": "alarm"
+    },
+    {
+      "id": "alr-1794136523768",
+      "label": "Alarm for 10:30 PM",
+      "time": "22:30",
+      "type": "alarm"
+    }
+  ],
   "timers": []
 }

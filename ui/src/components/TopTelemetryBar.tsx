@@ -1,22 +1,36 @@
 import React from 'react';
-import { Cpu, HardDrive, Battery, BatteryCharging, Wifi, WifiOff, Minimize2, Maximize2 } from 'lucide-react';
+import {
+  Battery,
+  BatteryCharging,
+  Cpu,
+  HardDrive,
+  Minimize2,
+  Maximize2,
+  Network,
+  Wifi,
+  WifiOff,
+  Cloud,
+  CloudOff,
+  Zap,
+} from 'lucide-react';
 
-interface TelemetryData {
+export interface TelemetryData {
   cpu: number;
   ram: number;
   battery: number;
-  charging: boolean;
+  charging?: boolean;
+  plugged?: boolean;
   online: boolean;
 }
 
-interface AudioData {
+export interface AudioData {
   mic_active: boolean;
   tts_active: boolean;
   status: 'idle' | 'listening' | 'thinking' | 'speaking';
   meeting_auto_muted: boolean;
 }
 
-interface TokenData {
+export interface TokenData {
   provider: string;
   model: string;
   latency_ms: number;
@@ -25,13 +39,52 @@ interface TokenData {
   total_session_tokens: number;
 }
 
-interface TopTelemetryBarProps {
+export interface TopTelemetryBarProps {
   telemetry: TelemetryData;
   audioState: AudioData;
   tokenData: TokenData;
   isMiniMode: boolean;
   onToggleMiniMode: () => void;
+  cloudApiEnabled?: boolean;
+  onToggleCloudApi?: () => void;
 }
+
+const safeNumber = (value: number | undefined, fallback = 0): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const Metric: React.FC<{
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  tone: 'blue' | 'orange';
+  detail?: string;
+}> = ({ label, value, icon, tone, detail }) => {
+  const bounded = Math.max(0, Math.min(100, safeNumber(value)));
+  const color = tone === 'orange' ? '#FF8A1F' : '#4DA3FF';
+  const tooltip = detail || `${label} Utilization: ${Math.round(bounded)}%`;
+
+  return (
+    <div
+      title={tooltip}
+      className="group relative min-w-[114px] cursor-help rounded-xl border border-white/10 bg-[#07111F]/70 px-3 py-1.5 backdrop-blur-md transition-all hover:border-[#4DA3FF]/40 hover:bg-[#07111F]/90"
+    >
+      <div className="mb-1 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.16em] text-steel group-hover:text-ice">
+        <span className="flex items-center gap-1.5">{icon}{label}</span>
+        <span className="font-mono text-ice">{Math.round(bounded)}%</span>
+      </div>
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-[#0E1F38]">
+        <div
+          className="h-full rounded-full transition-all duration-500 ease-out"
+          style={{
+            width: `${bounded}%`,
+            background: `linear-gradient(90deg, ${color}99, ${color})`,
+            boxShadow: `0 0 8px ${color}88`,
+          }}
+        />
+      </div>
+    </div>
+  );
+};
 
 export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   telemetry,
@@ -39,188 +92,105 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   tokenData,
   isMiniMode,
   onToggleMiniMode,
+  cloudApiEnabled = true,
+  onToggleCloudApi,
 }) => {
-  // Determine Core Visualizer State
-  const isAgentWorking = audioState.status === 'thinking';
-  const isAudioActive = audioState.status === 'listening' || audioState.status === 'speaking';
-
-  const coreColor = isAudioActive
-    ? '#00E5FF'
-    : isAgentWorking
-    ? '#FFB300'
-    : '#6488A4';
-
-  const coreGlow = isAudioActive
-    ? 'rgba(0, 229, 255, 0.4)'
-    : isAgentWorking
-    ? 'rgba(255, 179, 0, 0.4)'
-    : 'rgba(100, 136, 164, 0.15)';
-
-  // Arc Gauge renderer
-  const renderRadialGauge = (value: number, label: string, icon: React.ReactNode, color: string) => {
-    const radius = 22;
-    const stroke = 3;
-    const normalizedRadius = radius - stroke * 2;
-    const circumference = normalizedRadius * 2 * Math.PI;
-    const strokeDashoffset = circumference - (value / 100) * circumference;
-
-    return (
-      <div className="flex items-center space-x-2 bg-void/60 border border-cyber/50 px-2.5 py-1 rounded">
-        <div className="relative w-11 h-11 flex items-center justify-center">
-          <svg height={radius * 2} width={radius * 2} className="transform -rotate-90">
-            <circle
-              stroke="#16324A"
-              fill="transparent"
-              strokeWidth={stroke}
-              r={normalizedRadius}
-              cx={radius}
-              cy={radius}
-            />
-            <circle
-              stroke={color}
-              fill="transparent"
-              strokeWidth={stroke}
-              strokeDasharray={`${circumference} ${circumference}`}
-              style={{ strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out' }}
-              strokeLinecap="round"
-              r={normalizedRadius}
-              cx={radius}
-              cy={radius}
-            />
-          </svg>
-          <div className="absolute text-[10px] font-mono text-ice font-bold">{Math.round(value)}%</div>
-        </div>
-        <div className="flex flex-col">
-          <div className="flex items-center space-x-1 text-steel text-[10px] font-mono">
-            {icon}
-            <span>{label}</span>
-          </div>
-          <span className="text-xs font-mono font-bold text-ice">{value.toFixed(1)}%</span>
-        </div>
-      </div>
-    );
-  };
+  const currentAudio = audioState || { mic_active: false, tts_active: true, status: 'idle', meeting_auto_muted: false };
+  const currentTelemetry = telemetry || { cpu: 0, ram: 0, battery: 100, charging: true, online: true };
+  const currentToken = tokenData || { provider: '-', model: '-', latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_session_tokens: 0 };
+  const status = currentAudio.status || 'idle';
+  const isThinking = status === 'thinking';
+  const isLive = status === 'listening' || status === 'speaking';
+  const coreColor = isThinking ? '#FF8A1F' : isLive ? '#4DA3FF' : '#7D9AB8';
+  const online = currentTelemetry.online !== false;
+  const charging = currentTelemetry.charging ?? currentTelemetry.plugged ?? true;
 
   return (
-    <header className="w-full bg-tactical border-b border-cyber px-4 py-2 flex items-center justify-between hud-panel relative z-40 select-none">
-      {/* Left: Branding & Core Visualizer */}
-      <div className="flex items-center space-x-4">
-        {/* Dynamic Geometric Core Visualizer (NO MARVEL LOGOS) */}
-        <div className="relative w-12 h-12 flex items-center justify-center">
-          {/* Outer Segmented Tech Ring */}
-          <svg className="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="44"
-              fill="none"
-              stroke={coreColor}
-              strokeWidth="2"
-              strokeDasharray="18 10 35 12"
-              opacity="0.85"
-            />
-          </svg>
-          {/* Inner Counter-Rotating Ring */}
-          <svg className="absolute inset-0 w-full h-full animate-spin-reverse" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="34"
-              fill="none"
-              stroke={coreColor}
-              strokeWidth="1.5"
-              strokeDasharray="10 8 20 6"
-              opacity="0.65"
-            />
-          </svg>
-          {/* Concentric Geometric Hexagon Center */}
-          <div
-            className="w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300"
-            style={{
-              backgroundColor: coreColor,
-              boxShadow: `0 0 16px ${coreGlow}`,
-            }}
-          >
-            <div className="w-2 h-2 rounded-full bg-void animate-ping" />
-          </div>
+    <header className="relative z-40 flex min-h-[76px] items-center justify-between gap-3 border-b border-cyber/80 bg-[#09192D]/95 px-4 py-3 shadow-[0_12px_35px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:px-6">
+      {/* Brand & Status */}
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-arc/60 bg-cyan-arc/10" aria-label="JARVIS core">
+          <div className="absolute inset-1 rounded-xl border border-gold-reactor/50" />
+          <div className="h-3.5 w-3.5 rounded-full transition-all duration-300" style={{ background: coreColor, boxShadow: `0 0 20px ${coreColor}` }} />
+          <div className="absolute inset-0 rounded-2xl border border-cyan-arc/25 animate-ping" />
         </div>
-
-        {/* Brand & Status Text */}
-        <div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-hud font-black tracking-widest text-ice glow-cyan">
-              J.A.R.V.I.S. <span className="text-cyan-arc font-mono font-normal text-xs">2.0</span>
-            </span>
-            <span
-              className={`text-[9px] font-mono px-1.5 py-0.5 rounded uppercase font-bold tracking-wider ${
-                audioState.status === 'listening'
-                  ? 'bg-cyan-arc/20 text-cyan-arc border border-cyan-arc/40'
-                  : audioState.status === 'speaking'
-                  ? 'bg-cyan-arc/20 text-cyan-arc border border-cyan-arc/40'
-                  : audioState.status === 'thinking'
-                  ? 'bg-gold-reactor/20 text-gold-reactor border border-gold-reactor/40'
-                  : 'bg-cyber/40 text-steel border border-cyber'
-              }`}
-            >
-              {audioState.status}
-            </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-hud text-sm font-black tracking-[0.22em] text-ice">JARVIS</span>
+            <span className="rounded-full border border-gold-reactor/40 bg-gold-reactor/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-gold-reactor">command center</span>
           </div>
-          <div className="text-[10px] font-mono text-steel flex items-center space-x-2">
-            <span>SYS::ONLINE</span>
-            <span>•</span>
-            <span className="text-ice/70">{new Date().toLocaleTimeString()}</span>
+          <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-steel">
+            <span className={online ? 'text-emerald-300' : 'text-crimson'}>{online ? 'Core online' : 'Offline fallback'}</span>
+            <span className="text-cyber">/</span>
+            <span>{status}</span>
+            {currentAudio.meeting_auto_muted && <span className="text-gold-reactor">/ meeting muted</span>}
           </div>
         </div>
       </div>
 
-      {/* Center: Live Radial Gauges */}
-      <div className="hidden md:flex items-center space-x-3">
-        {renderRadialGauge(telemetry.cpu, 'CPU LOAD', <Cpu size={11} />, '#00E5FF')}
-        {renderRadialGauge(telemetry.ram, 'MEM USAGE', <HardDrive size={11} />, '#00E5FF')}
-        {renderRadialGauge(
-          telemetry.battery,
-          telemetry.charging ? 'CHARGING' : 'BATTERY',
-          telemetry.charging ? <BatteryCharging size={11} /> : <Battery size={11} />,
-          telemetry.battery < 20 ? '#FF3B5C' : '#00E5FF'
-        )}
-      </div>
-
-      {/* Right: Live Token & Latency Telemetry + Mini-HUD Toggle */}
-      <div className="flex items-center space-x-3">
-        {/* Token Telemetry HUD */}
-        <div className="hidden lg:flex flex-col text-right font-mono text-[10px] bg-void/60 border border-cyber/50 px-2.5 py-1 rounded">
-          <div className="flex items-center justify-end space-x-1.5 text-ice font-bold">
-            <span className="text-gold-reactor">{tokenData.provider.toUpperCase()}</span>
-            <span className="text-steel">/</span>
-            <span className="text-cyan-arc">{tokenData.model}</span>
-          </div>
-          <div className="flex items-center justify-end space-x-2 text-steel text-[9px]">
-            <span>{tokenData.latency_ms}ms</span>
-            <span>•</span>
-            <span>{tokenData.prompt_tokens + tokenData.completion_tokens} tok</span>
-            <span>•</span>
-            <span className="text-ice/90">Total: {tokenData.total_session_tokens}</span>
-          </div>
-        </div>
-
-        {/* Online Network Badge */}
-        <div
-          className={`flex items-center space-x-1 px-2 py-1 rounded text-[10px] font-mono border ${
-            telemetry.online
-              ? 'border-cyan-arc/30 bg-cyan-arc/10 text-cyan-arc'
-              : 'border-crimson/30 bg-crimson/10 text-crimson'
+      {/* Cloud API Off-Switch & Micro-Gauges */}
+      <div className="flex items-center gap-2.5">
+        {/* Prominent Cloud API Off-Switch Toggle Button */}
+        <button
+          type="button"
+          onClick={onToggleCloudApi}
+          title={cloudApiEnabled ? "Cloud APIs active (Groq, Gemini). Click to switch to Pure Offline Mode (0.05ms local NN)." : "Pure Offline Mode active (Air-Gapped, Zero Latency). Click to enable Cloud AI."}
+          className={`group relative flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200 select-none ${
+            cloudApiEnabled
+              ? 'border-[#4DA3FF]/50 bg-[#4DA3FF]/15 text-[#9DCEFF] hover:border-[#4DA3FF] hover:bg-[#4DA3FF]/25 stitch-glow-cyan'
+              : 'border-[#FF8A1F]/60 bg-[#FF8A1F]/15 text-[#FFB66F] hover:border-[#FF8A1F] hover:bg-[#FF8A1F]/25 stitch-glow-amber'
           }`}
-          title={telemetry.online ? 'Global Network Connected' : 'Offline Mode (Local Fallback Active)'}
         >
-          {telemetry.online ? <Wifi size={12} /> : <WifiOff size={12} />}
-          <span className="hidden sm:inline font-bold">{telemetry.online ? 'ONLINE' : 'OFFLINE'}</span>
-        </div>
+          <span
+            className="flex h-2 w-2 rounded-full transition-all duration-300"
+            style={{
+              background: cloudApiEnabled ? '#4DA3FF' : '#FF8A1F',
+              boxShadow: `0 0 8px ${cloudApiEnabled ? '#4DA3FF' : '#FF8A1F'}`,
+            }}
+          />
+          <span className="hidden sm:inline">
+            {cloudApiEnabled ? '☁️ Cloud AI: Active' : '⚡ Pure Offline (0.05ms NN)'}
+          </span>
+          <span className="sm:hidden">
+            {cloudApiEnabled ? '☁️ Cloud' : '⚡ Offline'}
+          </span>
+        </button>
 
-        {/* Mini-HUD Mode Toggle */}
+        {/* Telemetry Micro-Gauges */}
+        <div className="hidden items-center gap-2 xl:flex">
+          <Metric label="CPU" value={currentTelemetry.cpu} icon={<Cpu size={11} />} tone="blue" detail={`CPU Load: ${currentTelemetry.cpu}%`} />
+          <Metric label="Memory" value={currentTelemetry.ram} icon={<HardDrive size={11} />} tone="blue" detail={`RAM Usage: ${currentTelemetry.ram}%`} />
+          <Metric
+            label={charging ? 'Power' : 'Battery'}
+            value={currentTelemetry.battery}
+            icon={charging ? <BatteryCharging size={11} /> : <Battery size={11} />}
+            tone="orange"
+            detail={`Battery: ${currentTelemetry.battery}% (${charging ? 'Charging/Plugged' : 'Discharging'})`}
+          />
+        </div>
+      </div>
+
+      {/* Connection & Mini Mode Toggle */}
+      <div className="flex shrink-0 items-center gap-2">
+        <div className="hidden rounded-xl border border-white/8 bg-[#07111F]/60 px-3 py-2 text-right lg:block" title={`Active Provider: ${currentToken.provider} | Model: ${currentToken.model}`}>
+          <div className="flex items-center justify-end gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-ice">
+            <Network size={11} className="text-gold-reactor" />
+            <span className="max-w-[150px] truncate text-cyan-arc">{currentToken.provider || 'standby'}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-end gap-2 text-[9px] font-mono text-steel">
+            <span>{currentToken.latency_ms || 0}ms</span>
+            <span>•</span>
+            <span>{(currentToken.total_session_tokens || 0).toLocaleString()} tok</span>
+          </div>
+        </div>
+        <div className={`flex h-9 items-center gap-1.5 rounded-xl border px-2.5 text-[10px] font-bold uppercase tracking-wider ${online ? 'border-cyan-arc/40 bg-cyan-arc/10 text-cyan-arc' : 'border-crimson/40 bg-crimson/10 text-crimson'}`}>
+          {online ? <Wifi size={13} /> : <WifiOff size={13} />}
+          <span className="hidden sm:inline">{online ? 'connected' : 'offline'}</span>
+        </div>
         <button
           onClick={onToggleMiniMode}
-          className="p-1.5 bg-cyber/40 hover:bg-cyan-arc/20 border border-cyber hover:border-cyan-arc text-steel hover:text-cyan-arc rounded transition-colors"
-          title={isMiniMode ? 'Restore Full Tactical HUD' : 'Collapse to Ghost Mini-HUD'}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyber bg-cyber/30 text-steel transition hover:border-cyan-arc/60 hover:text-cyan-arc"
+          title={isMiniMode ? 'Restore full command center' : 'Open mini command mode'}
         >
           {isMiniMode ? <Maximize2 size={15} /> : <Minimize2 size={15} />}
         </button>
@@ -228,3 +198,4 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
     </header>
   );
 };
+

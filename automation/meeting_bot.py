@@ -229,6 +229,70 @@ class MeetingBot:
                 except Exception:
                     pass
 
+    @property
+    def live_captions(self) -> List[Dict[str, Any]]:
+        return self._current_state.get("captions", [])
+
+    @live_captions.setter
+    def live_captions(self, val: List[Dict[str, Any]]) -> None:
+        self._current_state["captions"] = list(val)
+
+    def _generate_post_call_summary(self, title: str) -> Optional[Dict[str, Any]]:
+        transcript_items = self.live_captions
+        full_text = "\n".join(f"[{c.get('timestamp', '')}] {c.get('text', '')}" for c in transcript_items)
+        summary_text = "No live captions were captured during this session."
+
+        router = self.llm_router
+        if router is None:
+            try:
+                from core.llm_router import router as default_router
+                router = default_router
+            except Exception:
+                router = None
+
+        if full_text.strip() and router is not None:
+            prompt = (
+                "Summarize the following meeting transcript with:\n"
+                "1. Executive Summary\n2. Key Decisions\n3. Action Items\n\n"
+                f"Transcript:\n{full_text[:12000]}"
+            )
+            try:
+                if hasattr(router, "query_text"):
+                    summary_text = router.query_text(prompt)
+                elif hasattr(router, "generate"):
+                    summary_text = router.generate(role="meeting_summarizer", prompt=prompt)
+                elif hasattr(router, "chat"):
+                    res = router.chat(messages=[{"role": "user", "content": prompt}], role="meeting_summarizer")
+                    summary_text = res.get("content", str(res)) if isinstance(res, dict) else str(res)
+            except Exception as exc:
+                summary_text = f"Automated summary generation failed: {exc}"
+
+        record = {
+            "id": f"sum_{int(time.time())}",
+            "meeting_id": self._current_state.get("meeting_id") or f"mtg_{int(time.time())}",
+            "title": title or "Meeting",
+            "url": self._current_state.get("url", ""),
+            "ended_at": datetime.now().isoformat(),
+            "captions_count": len(transcript_items),
+            "summary": summary_text,
+            "transcript": transcript_items,
+        }
+
+        try:
+            with open(SUMMARIES_PATH, "r", encoding="utf-8") as f:
+                summaries = json.load(f)
+        except Exception:
+            summaries = []
+
+        summaries.insert(0, record)
+        try:
+            with open(SUMMARIES_PATH, "w", encoding="utf-8") as f:
+                json.dump(summaries[:100], f, indent=2)
+        except Exception:
+            pass
+
+        return record
+
     def _handle_post_call(self, payload: Dict[str, Any]) -> None:
         if payload.get("setup_only"):
             return
@@ -252,7 +316,9 @@ class MeetingBot:
                     "1. Executive Summary\n2. Key Decisions\n3. Action Items\n\n"
                     f"Transcript:\n{full_text[:12000]}"
                 )
-                if hasattr(router, "generate"):
+                if hasattr(router, "query_text"):
+                    summary_text = router.query_text(prompt)
+                elif hasattr(router, "generate"):
                     summary_text = router.generate(role="meeting_summarizer", prompt=prompt)
                 elif hasattr(router, "chat"):
                     res = router.chat(messages=[{"role": "user", "content": prompt}], role="meeting_summarizer")
