@@ -1,19 +1,42 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Environment and secrets
 .env
+.env*.local
+
+# Virtual environments
 .venv/
 venv/
 env/
+ENV/
+
+# Node dependencies
 node_modules/
+
+# Browser and HUD runtime profiles
 .browser_profile/
 .hud_app_profile/
+JARVIS_HUD_Profile/
+
+# Bundles, dumps, and logs
 *.bundle
 *.log
+*.tmp
+jarvis-repomix.txt
+
+# OS metadata
 .DS_Store
+Thumbs.db
+
+# Agent session state
+.agents/state/
+.agents/teamwork/
+
+# Model weights: ignore heavy GGUF files, track lightweight ONNX intent model
 models/*.gguf
+*.gguf
 !models/intent_model.onnx
 !models/intent_vocab.json
-*.gguf
-.agents/state/
-

@@ -112,7 +112,7 @@
       "api_key": "sk-local",
       "model": "auto:jarvis",
       "url": "http://127.0.0.1:31415/v1",
-      "masked_key": "free\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022af79",
+      "masked_key": "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
       "default_model": "auto:jarvis",
       "enabled": true,
       "min_request_interval_ms": 65
@@ -124,7 +124,7 @@
       "api_key": "sk-local",
       "model": "auto",
       "url": "http://127.0.0.1:31415/v1",
-      "masked_key": "free\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022af79",
+      "masked_key": "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
       "default_model": "auto",
       "enabled": true,
       "min_request_interval_ms": 65
